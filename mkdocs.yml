@@ -1,0 +1,32 @@
+site_name: Tessera
+site_description: Mid-frequency ML trading system for crypto perpetual futures
+repo_url: https://github.com/Yash121l/Tessera
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Methodology: methodology.md
+  - Runbook: runbook.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+  - toc:
+      permalink: true

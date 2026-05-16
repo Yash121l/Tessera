@@ -1,0 +1,18 @@
+# Risk management configuration
+risk:
+  max_position_pct: 0.1
+  max_portfolio_heat: 0.2
+  max_correlated_positions: 3
+  stop_loss_atr_mult: 2.0
+  take_profit_atr_mult: 3.0
+
+sizing:
+  method: kelly_fractional
+  kelly_fraction: 0.25
+  max_size_usd: 5000
+
+limits:
+  max_open_orders: 10
+  max_daily_trades: 50
+  max_drawdown_pct: 5.0
+  cooldown_after_loss_minutes: 15

@@ -1,0 +1,17 @@
+# Feature engineering configuration
+features:
+  - name: frac_diff_close
+    lookback: 100
+    params:
+      d: 0.4
+      threshold: 1e-4
+
+  - name: vpin
+    lookback: 50
+    params:
+      bucket_size: 50
+
+  - name: kyle_lambda
+    lookback: 20
+
+bar_type: volume  # tick, volume, dollar, time

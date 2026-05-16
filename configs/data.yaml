@@ -1,0 +1,22 @@
+# Data ingestion configuration
+exchanges:
+  - name: binance
+    symbols:
+      - BTC/USDT:USDT
+      - ETH/USDT:USDT
+    timeframes:
+      - 1m
+      - 5m
+      - 1h
+  - name: bybit
+    symbols:
+      - BTC/USDT:USDT
+      - ETH/USDT:USDT
+    timeframes:
+      - 1m
+      - 5m
+
+storage:
+  format: parquet
+  path: ./data/raw
+  partition_by: [exchange, symbol, date]

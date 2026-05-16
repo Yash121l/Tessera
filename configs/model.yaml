@@ -1,0 +1,22 @@
+# Model training configuration
+model:
+  type: lightgbm
+  params:
+    n_estimators: 500
+    learning_rate: 0.05
+    max_depth: 6
+    num_leaves: 31
+    min_child_samples: 20
+    subsample: 0.8
+    colsample_bytree: 0.8
+
+cv:
+  method: purged_kfold
+  n_splits: 5
+  embargo_pct: 0.01
+
+optimization:
+  engine: optuna
+  n_trials: 100
+  metric: sharpe_ratio
+  direction: maximize

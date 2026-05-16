@@ -1,0 +1,18 @@
+# Live / paper trading configuration
+live:
+  mode: paper  # paper | live
+  exchange: binance
+  symbols:
+    - BTC/USDT:USDT
+    - ETH/USDT:USDT
+  poll_interval_ms: 1000
+
+position:
+  max_notional_usd: 10000
+  max_leverage: 3.0
+  funding_carry: true
+
+kill_switch:
+  max_drawdown_pct: 5.0
+  max_daily_loss_usd: 500.0
+  enabled: true

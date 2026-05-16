@@ -1,0 +1,19 @@
+# Backtest configuration
+backtest:
+  engine: nautilus
+  start_date: "2023-01-01"
+  end_date: "2024-01-01"
+  initial_capital: 100000.0
+  currency: USDT
+
+costs:
+  maker_fee_bps: 2.0
+  taker_fee_bps: 5.0
+  slippage_bps: 1.0
+  funding_rate: true
+
+reporting:
+  output_dir: ./reports
+  generate_tearsheet: true
+  deflated_sharpe: true
+  trial_count: 10

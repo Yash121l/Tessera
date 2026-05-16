@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Tessera"
+abstract: "Mid-frequency ML trading system for crypto perpetual futures"
+authors:
+  - family-names: "Lunawat"
+    given-names: "Yash"
+version: "0.1.0"
+date-released: "2026-05-17"
+license: MIT
+repository-code: "https://github.com/Yash121l/Tessera"
