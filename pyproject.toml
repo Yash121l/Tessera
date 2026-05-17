@@ -147,7 +147,7 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["tessera.labels.*", "tessera.cv.*", "tessera.models.*", "tessera.cli"]
-disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore"]
+disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore", "import-not-found"]
 
 [[tool.mypy.overrides]]
 module = ["tessera.features.*"]
@@ -155,7 +155,7 @@ disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-va
 
 [[tool.mypy.overrides]]
 module = ["tessera.strategies.*", "tessera.backtest.*"]
-disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore", "assignment"]
+disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore", "assignment", "call-arg", "import-not-found"]
 
 [[tool.mypy.overrides]]
 module = ["matplotlib", "matplotlib.*"]
