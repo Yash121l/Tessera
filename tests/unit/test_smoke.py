@@ -20,10 +20,9 @@ def test_version_is_semver() -> None:
 
 
 def test_config_defaults() -> None:
-    """Verify AppSettings can be instantiated with environment defaults."""
-    from tessera.config import AppSettings
+    """Verify TesseraSettings can be instantiated with environment defaults."""
+    from tessera.config import TesseraSettings
 
-    settings = AppSettings()
+    settings = TesseraSettings()
     assert settings.log_level == "INFO"
-    assert settings.debug is False
-    assert settings.kill_switch is False
+    assert settings.random_seed == 42

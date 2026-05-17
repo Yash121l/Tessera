@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from tessera.config import AppSettings
+from tessera.config import TesseraSettings
 
 
 @pytest.fixture
-def settings() -> AppSettings:
+def settings() -> TesseraSettings:
     """Create test settings instance with defaults."""
-    return AppSettings(debug=True, log_level="DEBUG")
+    return TesseraSettings(log_level="DEBUG")
