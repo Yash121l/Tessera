@@ -32,6 +32,8 @@ ml = [
     "stable-baselines3>=2.4,<3",
     "arch>=7.0,<8",
     "hmmlearn>=0.3,<1",
+    "shap>=0.46,<1",
+    "joblib>=1.4,<2",
 ]
 exchange = [
     "ccxt>=4.4,<5",
@@ -116,11 +118,27 @@ module = ["duckdb"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["sklearn", "sklearn.*", "arch", "arch.*", "hmmlearn", "hmmlearn.*"]
+module = ["sklearn", "sklearn.*", "arch", "arch.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["tessera.labels.*", "tessera.cv.*"]
+module = ["hmmlearn", "hmmlearn.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["lightgbm", "lightgbm.*", "optuna", "optuna.*", "joblib"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["shap", "shap.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["scipy", "scipy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tessera.labels.*", "tessera.cv.*", "tessera.models.*", "tessera.cli"]
 disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore"]
 
 [[tool.mypy.overrides]]

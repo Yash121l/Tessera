@@ -142,11 +142,7 @@ def get_bins(
 
     labels[t_first == t_upper] = 1
     labels[t_first == t_lower] = -1
-
-    # Where both upper and lower are NaT, vertical was hit → label by return sign
-    both_nat = t_upper.isna() & t_lower.isna()
-    labels[both_nat & (out["ret"] > 0)] = 1
-    labels[both_nat & (out["ret"] < 0)] = -1
+    # Vertical barrier hit first → label stays 0 (true AFML §3.5 interpretation)
 
     out["bin"] = labels
     return out[["ret", "bin"]]
