@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 
 import numpy as np
 import pandas as pd
 import pytest
+
+_lightgbm_available = importlib.util.find_spec("lightgbm") is not None
 
 
 class TestDeflatedSharpe:
@@ -64,6 +67,7 @@ class TestModelCard:
         assert restored.cv_scores.mean_sharpe == pytest.approx(0.5)
 
 
+@pytest.mark.skipif(not _lightgbm_available, reason="requires ml extra: uv sync --extra ml")
 @pytest.mark.filterwarnings("ignore::UserWarning")
 class TestRegistry:
     def test_save_and_promote(self, tmp_path: object) -> None:

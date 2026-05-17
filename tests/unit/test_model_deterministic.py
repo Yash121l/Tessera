@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+pytest.importorskip("lightgbm", reason="requires ml extra: uv sync --extra ml")
+
 
 def _make_data(n: int = 200, seed: int = 7) -> tuple[pd.DataFrame, pd.Series]:
     rng = np.random.RandomState(seed)

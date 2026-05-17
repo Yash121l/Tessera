@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+pytest.importorskip("lightgbm", reason="requires ml extra: uv sync --extra ml")
+
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
 class TestMonotonicConstraints:
