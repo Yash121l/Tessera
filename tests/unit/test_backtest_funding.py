@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-from nautilus_trader.model.data import Bar, BarType
-from nautilus_trader.model.objects import Price, Quantity
 
-from tessera.backtest.engine import TesseraBacktestEngine
-from tessera.strategies.base import TesseraBaseStrategy, TesseraStrategyConfig
+pytest.importorskip("nautilus_trader", reason="requires backtest extra: uv sync --extra backtest")
+
+from nautilus_trader.model.data import Bar, BarType  # noqa: E402
+from nautilus_trader.model.objects import Price, Quantity  # noqa: E402
+
+from tessera.backtest.engine import TesseraBacktestEngine  # noqa: E402
+from tessera.strategies.base import TesseraBaseStrategy, TesseraStrategyConfig  # noqa: E402
 
 _NS_PER_HOUR = 3_600_000_000_000
 
