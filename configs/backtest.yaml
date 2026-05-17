@@ -5,6 +5,25 @@ backtest:
   end_date: "2024-01-01"
   initial_capital: 100000.0
   currency: USDT
+  bar_type: "1-MINUTE-LAST-EXTERNAL"
+
+  # Latency: single draw from U[min, max] via backtest seed → Nautilus LatencyModel.
+  # For ablation, set both to the same value to fix latency.
+  latency_min_ms: 100
+  latency_max_ms: 500
+
+  # Signal delay in bars (0 = immediate; for ablation testing).
+  signal_delay_bars: 0
+
+  venues:
+    - exchange: binance
+      symbols:
+        - "BTC/USDT:USDT"
+        - "ETH/USDT:USDT"
+      vip_tier: 0
+      initial_balance_usdt: 100000.0
+      default_leverage: 3.0
+      funding_period_hours: 8
 
 costs:
   maker_fee_bps: 2.0

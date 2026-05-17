@@ -160,6 +160,18 @@ class ReportingConfig(BaseModel):
     trial_count: int = 10
 
 
+class VenueConfig(BaseModel):
+    """Per-venue configuration for the backtest engine."""
+
+    exchange: str = "binance"
+    symbols: list[str] = Field(default=["BTC/USDT:USDT", "ETH/USDT:USDT"])
+    vip_tier: int = 0
+    initial_balance_usdt: float = 100000.0
+    default_leverage: float = 3.0
+    # Funding cadence: 8h for most perps on Binance/Bybit; 4h for some Bybit pairs.
+    funding_period_hours: int = 8
+
+
 class BacktestEngineConfig(BaseModel):
     """Backtest engine settings."""
 
@@ -168,6 +180,16 @@ class BacktestEngineConfig(BaseModel):
     end_date: str = "2024-01-01"
     initial_capital: float = 100000.0
     currency: str = "USDT"
+    # Uniform-random latency range for order submission [min, max] ms.
+    # A single value is drawn from U[latency_min_ms, latency_max_ms] using
+    # the backtest seed and applied via Nautilus LatencyModel.
+    latency_min_ms: int = 100
+    latency_max_ms: int = 500
+    # Signal delay expressed in bar units. 0 = act on current bar's signal.
+    # Derived automatically from latency / bar_period; overridable for ablation.
+    signal_delay_bars: int = 0
+    bar_type: str = "1-MINUTE-LAST-EXTERNAL"
+    venues: list[VenueConfig] = Field(default_factory=lambda: [VenueConfig()])
 
 
 class BacktestConfig(BaseModel):

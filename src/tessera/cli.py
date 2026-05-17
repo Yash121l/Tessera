@@ -624,14 +624,123 @@ def train_ensemble(
     raise typer.Exit()
 
 
-@app.command()
-def backtest() -> None:
-    """Run backtest simulation."""
+backtest_app = typer.Typer(help="Event-driven Nautilus Trader backtest.")
+app.add_typer(backtest_app, name="backtest")
+
+
+@backtest_app.command("run")
+def backtest_run(
+    config_path: str = typer.Option(
+        "configs/backtest.yaml", "--config", help="Backtest YAML config"
+    ),
+    primary_model: str = typer.Option("", "--primary-model", help="Path to primary model dir"),
+    meta_model: str = typer.Option("", "--meta-model", help="Path to meta model dir"),
+    latency_ms: int = typer.Option(
+        -1, "--latency-ms", help="Override fixed latency in ms (-1 = use config range)"
+    ),
+    output_tearsheet: bool = typer.Option(
+        True, "--tearsheet/--no-tearsheet", help="Generate QuantStats HTML tearsheet"
+    ),
+) -> None:
+    """Run a full event-driven backtest using Nautilus Trader.
+
+    Loads OHLCV bars from the Parquet store for the configured universe and date
+    range, runs the ML Directional strategy, and writes results to
+    data/backtest_runs/<run_id>/.
+    """
+    import time
+    from pathlib import Path
+
     settings, run_id = _bootstrap()
     start_metrics_server(settings.prometheus_port)
     log = structlog.get_logger("tessera.cli.backtest")
-    log.info("subcommand started", subcommand="backtest", run_id=run_id)
-    typer.echo("TODO: backtest")
+    log.info("backtest_run_start", run_id=run_id, config=config_path)
+
+    from tessera.backtest.engine import TesseraBacktestEngine
+    from tessera.config import BacktestConfig, load_yaml
+    from tessera.strategies.ml_directional import MLDirectionalConfig, MLDirectionalStrategy
+
+    cfg: BacktestConfig = load_yaml(config_path)  # type: ignore[assignment]
+
+    # Collect instrument_ids from all configured venues
+    instrument_ids: list[str] = []
+    for venue_cfg in cfg.backtest.venues:
+        for ccxt_sym in venue_cfg.symbols:
+            nautilus_id = f"{ccxt_sym.split('/')[0]}-USDT-PERP.{venue_cfg.exchange.upper()}"
+            instrument_ids.append(nautilus_id)
+
+    if not instrument_ids:
+        typer.echo("No instruments configured in backtest.yaml. Add venues.symbols.")
+        raise typer.Exit(1)
+
+    log_dir = str(settings.data_root / "backtest_runs" / run_id)
+
+    strategy_config = MLDirectionalConfig(
+        instrument_ids=tuple(instrument_ids),
+        bar_type_suffix=cfg.backtest.bar_type,
+        primary_model_path=primary_model,
+        meta_model_path=meta_model,
+        max_drawdown_pct=cfg.costs.maker_fee_bps * 2.5,  # rough kill-switch threshold
+        signal_delay_bars=cfg.backtest.signal_delay_bars,
+        log_dir=log_dir,
+    )
+    strategy = MLDirectionalStrategy(config=strategy_config)
+
+    if latency_ms > 0:
+        # Override: fix both min and max to get a deterministic latency
+        from tessera.config import BacktestEngineConfig
+
+        cfg.backtest = BacktestEngineConfig(
+            **{
+                **cfg.backtest.model_dump(),
+                "latency_min_ms": latency_ms,
+                "latency_max_ms": latency_ms,
+            }
+        )
+
+    engine = TesseraBacktestEngine.from_config(
+        cfg, settings, strategy, run_id, seed=settings.random_seed
+    )
+
+    t0 = time.time()
+    result = engine.run()
+    elapsed = time.time() - t0
+
+    # Summary output
+    typer.echo("\n" + "=" * 60)
+    typer.echo(f"Run ID:          {result.run_id}")
+    typer.echo(f"Date range:      {result.start_date} → {result.end_date}")
+    typer.echo(f"Bars processed:  {result.n_bars:,}")
+    typer.echo(f"Trades:          {result.n_trades:,}")
+    typer.echo(f"Total PnL:       ${result.total_pnl:,.2f}")
+    typer.echo(f"  Trading:       ${result.trading_pnl:,.2f}")
+    typer.echo(f"  Funding:       ${result.funding_pnl:,.2f}")
+    typer.echo(f"  Fees:          ${result.fee_pnl:,.2f}")
+    typer.echo(f"Total return:    {result.total_return:.2%}")
+    typer.echo(f"Sharpe ratio:    {result.sharpe_ratio:.3f}")
+    typer.echo(f"Sortino ratio:   {result.sortino_ratio:.3f}")
+    typer.echo(f"Max drawdown:    {result.max_drawdown:.2%}")
+    typer.echo(f"Wall-clock time: {elapsed:.1f}s")
+    typer.echo(f"Log dir:         {result.log_dir}")
+    typer.echo("=" * 60)
+
+    if output_tearsheet and not result.equity_curve.empty:
+        try:
+            import quantstats as qs
+
+            daily_returns = result.equity_curve.pct_change().dropna()
+            if not daily_returns.empty:
+                tearsheet_path = Path("docs/figures") / f"tearsheet_{run_id}.html"
+                tearsheet_path.parent.mkdir(parents=True, exist_ok=True)
+                qs.reports.html(  # type: ignore[no-untyped-call]
+                    daily_returns, output=str(tearsheet_path), title=f"Tessera Backtest {run_id}"
+                )
+                typer.echo(f"Tearsheet:       {tearsheet_path}")
+        except ImportError:
+            typer.echo("(QuantStats not installed — skipping tearsheet)")
+        except Exception as e:
+            typer.echo(f"(Tearsheet generation failed: {e})")
+
     raise typer.Exit()
 
 
