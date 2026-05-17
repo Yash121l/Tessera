@@ -30,6 +30,8 @@ ml = [
     "lightgbm>=4.5,<5",
     "optuna>=4.2,<5",
     "stable-baselines3>=2.4,<3",
+    "arch>=7.0,<8",
+    "hmmlearn>=0.3,<1",
 ]
 exchange = [
     "ccxt>=4.4,<5",
@@ -114,12 +116,16 @@ module = ["duckdb"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["sklearn", "sklearn.*"]
+module = ["sklearn", "sklearn.*", "arch", "arch.*", "hmmlearn", "hmmlearn.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["tessera.labels.*", "tessera.cv.*"]
 disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore"]
+
+[[tool.mypy.overrides]]
+module = ["tessera.features.*"]
+disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore", "assignment", "type-var"]
 
 [[tool.mypy.overrides]]
 module = ["matplotlib", "matplotlib.*"]

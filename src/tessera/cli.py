@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pandas as pd
 import structlog
 import typer
 
@@ -95,13 +96,104 @@ def ingest_ohlcv(
     raise typer.Exit()
 
 
-@app.command()
-def features() -> None:
-    """Compute features from raw data."""
+features_app = typer.Typer(help="Feature engineering pipeline.")
+app.add_typer(features_app, name="features")
+
+
+@features_app.command("build")
+def features_build(
+    start: str = typer.Option("2021-01-01", help="Start date (YYYY-MM-DD)"),
+    end: str = typer.Option("2024-12-31", help="End date (YYYY-MM-DD)"),
+    symbols: str | None = typer.Option(None, help="Comma-separated symbols (default: all active)"),
+) -> None:
+    """Run the full feature pipeline for all symbols over a date range."""
+    import time
+
+    from tessera.features import (
+        FeaturePipeline,
+        FundingRate,
+        FundingZScore,
+        GarmanKlass,
+        LogReturn,
+        MicroPrice,
+        OrderFlowImbalance,
+        Parkinson,
+        RealizedVol,
+        SpotPerpBasis,
+        SpreadBps,
+        VolOfVol,
+    )
+
     settings, run_id = _bootstrap()
     log = structlog.get_logger("tessera.cli.features")
-    log.info("subcommand started", subcommand="features", run_id=run_id)
-    typer.echo("TODO: features")
+    log.info("feature_build_start", run_id=run_id, start=start, end=end)
+
+    feature_list = [
+        LogReturn(horizon=1),
+        LogReturn(horizon=5),
+        LogReturn(horizon=15),
+        LogReturn(horizon=60),
+        LogReturn(horizon=240),
+        LogReturn(horizon=1440),
+        RealizedVol(window=300),
+        RealizedVol(window=60),
+        RealizedVol(window=1440),
+        Parkinson(window=60),
+        GarmanKlass(window=60),
+        VolOfVol(window=60),
+        OrderFlowImbalance(depth=1),
+        MicroPrice(),
+        SpreadBps(),
+        FundingRate(),
+        FundingZScore(window=720),
+        SpotPerpBasis(),
+    ]
+
+    pipeline = FeaturePipeline(feature_list)
+
+    from tessera.data.store import read_parquet
+
+    if symbols:
+        symbol_list = [s.strip() for s in symbols.split(",")]
+    else:
+        from tessera.data.universe import Universe
+
+        universe = Universe()
+        symbol_list = universe.active_at(datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=UTC))
+        if not symbol_list:
+            typer.echo("No active symbols. Run 'tessera ingest universe' first.")
+            raise typer.Exit(1)
+
+    t0 = time.time()
+    total_rows = 0
+
+    for sym in symbol_list:
+        log.info("feature_build_symbol", symbol=sym)
+        df = read_parquet(
+            "ohlcv",
+            filters=[
+                ("symbol", "==", sym),
+            ],
+        )
+        if df.empty:
+            log.warning("no_data", symbol=sym)
+            continue
+
+        if "event_time" in df.columns:
+            df["event_time"] = pd.to_datetime(df["event_time"])
+            mask = (df["event_time"] >= start) & (df["event_time"] <= end)
+            df = df[mask]
+
+        if df.empty:
+            continue
+
+        result = pipeline.compute_multi_day(df, symbol=sym)
+        total_rows += len(result)
+        typer.echo(f"  {sym}: {len(result)} rows, {len(feature_list)} features")
+
+    elapsed = time.time() - t0
+    log.info("feature_build_complete", total_rows=total_rows, elapsed_s=round(elapsed, 1))
+    typer.echo(f"Feature build complete: {total_rows} rows in {elapsed:.1f}s")
     raise typer.Exit()
 
 
