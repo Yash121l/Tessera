@@ -1,0 +1,161 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Bar Feed Health",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.5 },
+              { "color": "green", "value": 0.8 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Bar Arrival Rate (bars/min per symbol)",
+      "type": "stat",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_bar_arrival_rate_per_min", "legendFormat": "{{exchange}}:{{symbol}}" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 30 },
+              { "color": "red", "value": 60 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Last Bar Age (seconds)",
+      "type": "stat",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_last_bar_age_seconds", "legendFormat": "{{exchange}}:{{symbol}}" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "id": 101,
+      "title": "Bar Arrival Rate History",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "none", "custom": { "lineWidth": 2 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Gap threshold (0.5 bars/min)" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }, { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } } ] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 10,
+      "options": { "legend": { "calcs": ["lastNotNull", "min"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Bar Arrival Rate per Symbol (bars/min)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_bar_arrival_rate_per_min", "legendFormat": "{{exchange}}:{{symbol}}" },
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "0.5 + 0*tessera_bar_arrival_rate_per_min", "legendFormat": "Gap threshold (0.5 bars/min)" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 102,
+      "title": "Funding Rate Feed",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "none", "custom": { "lineWidth": 1 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "id": 20,
+      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Fills by Symbol (rate/5m)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "rate(tessera_fills_total[5m])", "legendFormat": "{{exchange}}:{{symbol}}:{{side}}" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "none", "custom": { "lineWidth": 2 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "id": 21,
+      "options": { "legend": { "calcs": ["lastNotNull", "sum"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Runner Restarts (cumulative)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_runner_restarts_total", "legendFormat": "restarts" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 103,
+      "title": "Alert Annotations",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
+      "id": 30,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Kill Switch Triggers (cumulative)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_kill_switch_triggers_total", "legendFormat": "{{trigger}}" }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["tessera", "data-quality"],
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Tessera — Data Quality",
+  "uid": "tessera-data-quality",
+  "version": 1
+}

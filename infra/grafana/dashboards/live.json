@@ -1,0 +1,252 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "System Health",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "text": "ACTIVE", "color": "red" }, "1": { "text": "CLEAR", "color": "green" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Kill Switch",
+      "type": "stat",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_kill_switch_active", "legendFormat": "kill switch" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Reconciliation Status",
+      "type": "stat",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_reconcile_ok", "legendFormat": "{{venue}}" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "s",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 8 }, { "color": "red", "value": 12 } ] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Heartbeat Age",
+      "type": "stat",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "time() - tessera_heartbeat_ts", "legendFormat": "age" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "ms",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 100 }, { "color": "red", "value": 500 } ] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Exchange Ping",
+      "type": "stat",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_exchange_ping_latency_seconds * 1000", "legendFormat": "{{exchange}}" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "PnL",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "currencyUSD", "custom": { "lineWidth": 2 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 10,
+      "options": { "legend": { "calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "PnL — Realized vs Unrealized (USD)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_pnl_realized_usd", "legendFormat": "Realized" },
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_pnl_unrealized_usd", "legendFormat": "Unrealized" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "unit": "percentunit",
+          "min": 0,
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.03 }, { "color": "red", "value": 0.05 } ] }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 11,
+      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Drawdown (% of Peak Equity)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_drawdown_pct", "legendFormat": "Drawdown" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 102,
+      "title": "Positions & Fees",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "none", "custom": { "lineWidth": 2 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "id": 20,
+      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Position by Symbol (base units)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_position_units", "legendFormat": "{{exchange}}:{{symbol}}" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "currencyUSD", "custom": { "lineWidth": 2 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "id": 21,
+      "options": { "legend": { "calcs": ["lastNotNull", "sum"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Fee Paid — Cumulative (USD)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_fee_paid_usd_total", "legendFormat": "{{exchange}}:{{symbol}}" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "id": 103,
+      "title": "Latency",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms", "custom": { "lineWidth": 2 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "id": 30,
+      "options": { "legend": { "calcs": ["lastNotNull", "mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Signal Latency (bar-close → signal emit) ms",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "histogram_quantile(0.50, rate(tessera_signal_latency_seconds_bucket[5m])) * 1000", "legendFormat": "p50" },
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "histogram_quantile(0.95, rate(tessera_signal_latency_seconds_bucket[5m])) * 1000", "legendFormat": "p95" },
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "histogram_quantile(0.99, rate(tessera_signal_latency_seconds_bucket[5m])) * 1000", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms", "custom": { "lineWidth": 2 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "id": 31,
+      "options": { "legend": { "calcs": ["lastNotNull", "mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Order Round-Trip Latency ms",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "histogram_quantile(0.50, rate(tessera_order_latency_seconds_bucket[5m])) * 1000", "legendFormat": "p50 {{exchange}}" },
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "histogram_quantile(0.95, rate(tessera_order_latency_seconds_bucket[5m])) * 1000", "legendFormat": "p95 {{exchange}}" },
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "histogram_quantile(0.99, rate(tessera_order_latency_seconds_bucket[5m])) * 1000", "legendFormat": "p99 {{exchange}}" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "id": 104,
+      "title": "Slippage & Reconciliation",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "none", "custom": { "lineWidth": 2 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Modeled (bps)" }, "properties": [ { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } } ] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "id": 40,
+      "options": { "legend": { "calcs": ["lastNotNull", "mean"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Slippage: Realized vs Modeled (bps)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "histogram_quantile(0.50, rate(tessera_slippage_realized_bps_bucket[5m]))", "legendFormat": "Realized p50 {{symbol}}" },
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "2.5", "legendFormat": "Modeled (bps)" }
+      ]
+    },
+    {
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "none", "custom": { "lineWidth": 2 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "id": 41,
+      "options": { "legend": { "calcs": ["lastNotNull", "sum"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Reconciliation Mismatches (cumulative)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" }, "expr": "tessera_reconcile_mismatch_total", "legendFormat": "{{symbol}}" }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["tessera", "live"],
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Tessera — Live Trading",
+  "uid": "tessera-live",
+  "version": 1
+}

@@ -1,0 +1,44 @@
+[Unit]
+Description=Tessera Paper Trading Runner
+Documentation=https://github.com/Yash121l/tessera/blob/main/docs/runbook.md
+After=network-online.target docker.service postgresql.service redis.service
+Wants=network-online.target
+# Restart the unit if it exits before getting to the stop state
+StartLimitIntervalSec=3600
+# Allow at most 5 manual restarts per hour (internal runner also limits to 5/hr)
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=tessera
+Group=tessera
+WorkingDirectory=/opt/tessera
+
+# Load secrets from an env file (chmod 600, owned by tessera user)
+EnvironmentFile=/opt/tessera/.env
+
+ExecStart=/opt/tessera/.venv/bin/tessera paper start --config configs/live.yaml
+ExecStop=/opt/tessera/.venv/bin/tessera paper stop
+
+# Restart on any non-zero exit code (crash) but not on clean SIGTERM
+Restart=on-failure
+RestartSec=5s
+
+# Output goes to journald — tail with: journalctl -u tessera-paper -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tessera-paper
+
+# Resource limits
+LimitNOFILE=65536
+TimeoutStartSec=60s
+TimeoutStopSec=30s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/tessera/paper /opt/tessera/data /opt/tessera/logs
+
+[Install]
+WantedBy=multi-user.target

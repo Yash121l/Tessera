@@ -841,14 +841,98 @@ def report_backtest(
     raise typer.Exit()
 
 
-@app.command()
-def paper() -> None:
-    """Run paper trading (live data, simulated execution)."""
+paper_app = typer.Typer(help="Paper trading against Binance Testnet and Bybit Demo.")
+app.add_typer(paper_app, name="paper")
+
+
+@paper_app.command("start")
+def paper_start(
+    config_path: str = typer.Option("configs/live.yaml", "--config", help="Live YAML config path"),
+    healthcheck_port: int = typer.Option(8080, "--healthcheck-port", help="Port for /healthz"),
+) -> None:
+    """Start the paper trading runner (blocks until stopped or crash limit hit)."""
+    from tessera.config import LiveConfig, load_yaml
+    from tessera.live.paper import PaperRunner, read_pid
+
     settings, run_id = _bootstrap()
     start_metrics_server(settings.prometheus_port)
     log = structlog.get_logger("tessera.cli.paper")
-    log.info("subcommand started", subcommand="paper", run_id=run_id)
-    typer.echo("TODO: paper")
+
+    # Warn if already running
+    existing_pid = read_pid()
+    if existing_pid is not None:
+        typer.echo(f"Warning: PID file exists (pid={existing_pid}). Already running?")
+
+    cfg: LiveConfig = load_yaml(config_path)  # type: ignore[assignment]
+    log.info("paper_start", run_id=run_id, config=config_path)
+
+    runner = PaperRunner(cfg, settings, run_id, healthcheck_port=healthcheck_port)
+    typer.echo(f"Paper runner starting (run_id={run_id}, healthcheck=:{healthcheck_port}/healthz)")
+    runner.run()
+    raise typer.Exit()
+
+
+@paper_app.command("status")
+def paper_status() -> None:
+    """Print current paper runner state from Postgres."""
+    import psycopg2
+
+    settings, _ = _bootstrap()
+
+    try:
+        conn = psycopg2.connect(settings.postgres_dsn, connect_timeout=5)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT run_id, status, pid, crash_reason, started_at, updated_at
+                FROM paper_runner_state
+                ORDER BY updated_at DESC
+                LIMIT 5
+                """
+            )
+            rows = cur.fetchall()
+        conn.close()
+    except Exception as exc:
+        typer.echo(f"Failed to query Postgres: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    if not rows:
+        typer.echo("No paper runner state found in Postgres.")
+        raise typer.Exit()
+
+    from tessera.live.paper import read_pid
+
+    live_pid = read_pid()
+
+    typer.echo("\nPaper runner state (most recent first):")
+    typer.echo("=" * 70)
+    for run_id, status, pid, crash_reason, started_at, updated_at in rows:
+        is_current = live_pid is not None and pid == live_pid
+        marker = " ← CURRENT" if is_current else ""
+        typer.echo(f"  run_id:    {run_id}{marker}")
+        typer.echo(f"  status:    {status}")
+        typer.echo(f"  pid:       {pid}")
+        if crash_reason:
+            typer.echo(f"  reason:    {crash_reason}")
+        typer.echo(f"  started:   {started_at}")
+        typer.echo(f"  updated:   {updated_at}")
+        typer.echo("-" * 70)
+
+    raise typer.Exit()
+
+
+@paper_app.command("stop")
+def paper_stop() -> None:
+    """Send SIGTERM to the running paper trader via PID file."""
+    from tessera.live.paper import send_stop_signal
+
+    _bootstrap()
+    sent = send_stop_signal()
+    if sent:
+        typer.echo("SIGTERM sent. Runner will flatten positions and stop.")
+    else:
+        typer.echo("No running paper trader found (PID file missing or stale).")
+        raise typer.Exit(1)
     raise typer.Exit()
 
 

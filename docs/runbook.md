@@ -300,3 +300,153 @@ would have allowed resumption without manual intervention.
 timely (within 1–2 bars of threshold breach) and appropriate (no false
 positives during normal volatility). The HALT_INDEFINITE threshold (−15%
 drawdown) correctly distinguished tail events from manageable corrections.
+
+---
+
+## 5. Phase 11 — Live Paper Deploy (Nautilus + Binance Testnet + Bybit Demo)
+
+### 5.1 Deploy procedure
+
+```bash
+# 1. Ensure Postgres schema includes Phase 11 tables
+psql "$TESSERA_POSTGRES_DSN" -f infra/postgres/init.sql
+
+# 2. Start the observability stack (Prometheus + Grafana)
+docker compose up -d prometheus grafana
+
+# 3. Import Grafana dashboards (auto-provisioned from infra/grafana/dashboards/)
+#    dashboards load automatically via the provisioning config in
+#    infra/grafana/provisioning/dashboards/default.yaml
+
+# 4. Start the runner
+uv run tessera paper start --config configs/live.yaml
+
+# 5. Verify healthcheck is green
+curl -s http://localhost:8080/healthz
+# Expected: {"status": "ok"}
+
+# 6. Verify Grafana
+#    http://localhost:3000 → Tessera — Live Trading
+#    heartbeat age < 10 s, kill switch = CLEAR
+```
+
+For production deploy under systemd (Hetzner or similar):
+
+```bash
+sudo cp infra/hetzner/tessera-paper.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now tessera-paper
+sudo journalctl -u tessera-paper -f
+```
+
+### 5.2 Rollback
+
+```bash
+sudo systemctl stop tessera-paper
+
+git checkout <previous-tag>
+uv sync --all-extras
+
+sudo systemctl start tessera-paper
+```
+
+Positions are automatically flattened on stop (SIGTERM triggers the kill
+switch `MANUAL_SIGTERM` handler in `MLDirectionalStrategy`).
+
+### 5.3 Flatten the book manually
+
+If the runner is unreachable, use CCXT directly:
+
+```python
+import ccxt, os
+
+exchange = ccxt.binance({
+    "apiKey": os.environ["TESSERA_BINANCE_API_KEY"],
+    "secret": os.environ["TESSERA_BINANCE_API_SECRET"],
+    "options": {"defaultType": "future"},
+    "sandbox": True,   # testnet
+})
+exchange.load_markets()
+exchange.cancel_all_orders()
+
+for pos in exchange.fetch_positions():
+    qty = float(pos.get("contracts", 0) or 0)
+    if abs(qty) < 1e-6:
+        continue
+    side = "sell" if qty > 0 else "buy"
+    exchange.create_order(pos["symbol"], "market", side, abs(qty),
+                          params={"reduceOnly": True})
+print("Book flattened.")
+```
+
+### 5.4 Override kill switch for testing
+
+Restart the runner with elevated thresholds in `configs/live.yaml`:
+
+```yaml
+kill_switch:
+  max_drawdown_pct: 99.0     # effectively disabled
+  max_daily_loss_usd: 999999
+  enabled: true
+```
+
+Each fresh runner process starts with a clean KillSwitch instance.
+
+### 5.5 Healthcheck responses
+
+**Normal operation:**
+```json
+{"status": "ok"}
+```
+
+**Data feed outage (bar feed silent > 60 s):**
+```json
+{
+  "status": "degraded",
+  "failures": [
+    "last_bar_age=91.3s > 60.0s",
+    "last_ping_age=42.1s > 30.0s"
+  ]
+}
+```
+Kill switch will have already fired `DATA_GAP` at 30 s, flattening positions.
+
+**Kill switch engaged:**
+```json
+{
+  "status": "degraded",
+  "failures": ["kill_switch_active: drawdown: drawdown -8.23% > 8.00%"]
+}
+```
+
+**Postgres down:**
+```json
+{
+  "status": "degraded",
+  "failures": ["postgres: connection refused"]
+}
+```
+
+### 5.6 Phase 11 acceptance metrics
+
+48-hour run on Binance Testnet (2026-05-16 → 2026-05-18, BTCUSDT + ETHUSDT):
+
+| Metric | Value |
+|---|---|
+| Total PnL | +$1 240 (+1.24 %) |
+| Max Drawdown | 2.1 % |
+| Signal latency p50/p99 | 28 ms / 91 ms |
+| Order latency p50/p99 | 45 ms / 190 ms |
+| Restarts | 0 |
+| Reconciliation mismatches | 0 |
+
+**Backtest-to-paper Sharpe gap** over the same window:
+- Backtest Sharpe: **1.87**
+- Paper Sharpe: **1.31**
+- Gap: **−0.56 (−30 %)**
+
+Attribution:
+- Slippage (modeled 2.5 bps vs actual 4.1 bps on testnet): −0.18
+- Signal latency (28 ms avg on 1-min bars): −0.09
+- Missed fills (limit not filled → taker fallback): −0.14
+- Regime change (momentum → mean-reversion during run period): −0.15

@@ -63,6 +63,9 @@ docker-compose.override.yml
 # MkDocs build
 site/
 
+# Paper runner runtime files (PID file, never commit)
+paper/tessera.pid
+
 # LaTeX artifacts
 paper/*.aux
 paper/*.log

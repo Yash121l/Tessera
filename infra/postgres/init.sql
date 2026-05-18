@@ -42,3 +42,26 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_fills_order_id ON fills(order_id);
 CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
+
+-- Paper runner state (upserted by PaperRunner._pg_write_state)
+CREATE TABLE IF NOT EXISTS paper_runner_state (
+    run_id       VARCHAR(64) PRIMARY KEY,
+    status       VARCHAR(16) NOT NULL DEFAULT 'running',
+    pid          INTEGER,
+    crash_reason TEXT,
+    started_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Reconciliation audit log
+CREATE TABLE IF NOT EXISTS reconciliation_log (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id      VARCHAR(64) NOT NULL,
+    checked_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status      VARCHAR(16) NOT NULL,  -- 'ok' | 'mismatch'
+    details     JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_runner_state_status ON paper_runner_state(status);
+CREATE INDEX IF NOT EXISTS idx_reconcile_log_run_id ON reconciliation_log(run_id);
+CREATE INDEX IF NOT EXISTS idx_reconcile_log_checked_at ON reconciliation_log(checked_at);

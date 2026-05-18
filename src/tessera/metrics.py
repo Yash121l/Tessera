@@ -80,6 +80,64 @@ DRAWDOWN_PCT = Gauge(
 )
 
 
+# ---------------------------------------------------------------------------
+# Live trading metrics
+# ---------------------------------------------------------------------------
+
+HEARTBEAT_TS = Gauge(
+    "tessera_heartbeat_ts",
+    "Unix timestamp of last live runner heartbeat. Staleness > 10s indicates a stalled loop.",
+)
+
+RUNNER_RESTARTS = Counter(
+    "tessera_runner_restarts_total",
+    "Number of PaperRunner crash-restarts since process start.",
+)
+
+RECONCILE_OK = Gauge(
+    "tessera_reconcile_ok",
+    "1 if the last position reconciliation matched exchange, 0 on mismatch.",
+    ["venue"],
+)
+
+RECONCILE_MISMATCH = Counter(
+    "tessera_reconcile_mismatch_total",
+    "Position reconciliation mismatches (internal vs exchange) by symbol.",
+    ["symbol"],
+)
+
+FEE_PAID_USD = Counter(
+    "tessera_fee_paid_usd_total",
+    "Cumulative fees paid in USD.",
+    ["exchange", "symbol"],
+)
+
+SLIPPAGE_REALIZED_BPS = Histogram(
+    "tessera_slippage_realized_bps",
+    "Realized slippage vs mid-price in basis points per fill.",
+    ["symbol"],
+    buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0),
+)
+
+BAR_ARRIVAL_RATE = Gauge(
+    "tessera_bar_arrival_rate_per_min",
+    "Rate of bar arrivals over the last minute (bars/min). Gap < 0.5 indicates feed degradation.",
+    ["exchange", "symbol"],
+)
+
+LAST_BAR_AGE = Gauge(
+    "tessera_last_bar_age_seconds",
+    "Seconds elapsed since the last bar was received. >60s triggers data-gap kill switch.",
+    ["exchange", "symbol"],
+)
+
+EXCHANGE_PING_LATENCY = Gauge(
+    "tessera_exchange_ping_latency_seconds",
+    "Latency of the last successful exchange ping round-trip in seconds.",
+    ["exchange"],
+)
+
+
 def start_metrics_server(port: int = 9090) -> None:
     """Start the Prometheus HTTP metrics server.
 
