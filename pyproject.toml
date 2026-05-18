@@ -201,6 +201,7 @@ testpaths = ["tests"]
 addopts = "--strict-markers --tb=short"
 markers = [
     "slow: marks tests as slow (deselect with -m 'not slow')",
+    "live_testnet: requires live exchange credentials and network access (Binance Testnet / Bybit Demo)",
 ]
 
 [tool.coverage.run]
