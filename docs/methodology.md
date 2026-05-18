@@ -104,6 +104,126 @@ For non-overlapping features or as a simpler baseline:
 - **Rolling window**: Train on [t-W, t), test on [t, t+Δ). Fixed-size
   training window slides forward.
 
+## Probabilistic Sharpe Ratio (PSR)
+
+The naive Sharpe ratio is an estimator, not the true population ratio.  For a
+return series of length T with skewness γ₃ and excess kurtosis γ₄:
+
+```
+Var(SR̂) ≈ [1 − γ₃·SR̂_p + (γ₄+2)/4·SR̂_p²] / (T−1)
+```
+
+where SR̂_p = SR̂_annual / √ann is the per-period ratio.
+
+**PSR(SR₀) = Φ[(SR̂_p − SR₀_p) / √Var(SR̂_p)]**
+
+This gives the probability that the *true* population Sharpe exceeds a
+benchmark SR₀ (usually 0) given the sample evidence.
+
+Two corrections distinguish PSR from the plain z-test:
+
+| Source of uncertainty | Standard Sharpe | PSR |
+|-----------------------|-----------------|-----|
+| Estimation noise | Ignored | Accounted via T |
+| Non-normal returns (fat tails, skew) | Ignored | Accounted via γ₃, γ₄ |
+
+### Interpretation
+- PSR < 0.75: weak evidence — could easily be a lucky run.
+- PSR 0.75–0.95: moderate evidence — worth more data.
+- PSR ≥ 0.95: strong evidence — deploy-ready under stable conditions.
+
+---
+
+## Deflated Sharpe Ratio (DSR)
+
+When N strategies or hyperparameter configurations are tested, the best
+observed SR is inflated by selection bias.  Bailey & López de Prado (2014)
+correct for this by raising the benchmark to the *expected maximum SR under
+H₀* (no skill):
+
+```
+SR* = σ_SR × [(1−γ_em)·Φ⁻¹(1−1/N) + γ_em·Φ⁻¹(1−1/(N·e))]
+```
+
+where γ_em = 0.5772… (Euler-Mascheroni) and σ_SR is the standard deviation
+of SRs across the N independent trials.
+
+**DSR = PSR(observed_sr, SR*, T, γ₃, γ₄)**
+
+DSR answers: "if N random configs were tested with no skill, how often would
+we see an SR this high by luck alone?" A DSR of 0.95 means only a 5% chance
+the result is pure luck.
+
+### Trial count — what must be included
+
+Every model selection decision inflates the apparent SR:
+
+| Source | Count as trials |
+|--------|----------------|
+| Optuna hyperparameter search | Each completed trial |
+| Manual notebook grid searches | Each configuration run |
+| Ablation variants (latency × slippage) | Each variant |
+| Architecture decisions (primary vs. meta vs. ensemble) | Each model type evaluated |
+
+Use `compute_trial_count(optuna_study, manual_configs)` to aggregate all
+sources.  Undercounting N makes DSR look better than it is.
+
+### Example
+With SR = 2.0, T = 252, N = 180 trials, σ_SR = 0.5:
+
+- SR* ≈ 0.5 × 2.37 ≈ 1.19 (expected lucky max)
+- DSR = PSR(2.0, 1.19, 252) ≈ 0.84
+
+Conclusion: 84% probability of genuine skill.  Borderline.
+
+---
+
+## Bootstrap Confidence Interval for Sharpe
+
+Strategy returns are serially correlated (each position spans multiple bars),
+so IID bootstrap underestimates Sharpe uncertainty.  We use the **stationary
+block bootstrap** (Politis & Romano 1994) which:
+
+1. Draws contiguous blocks of length L from the return series.
+2. Randomises block lengths (geometric distribution with mean L) to avoid
+   edge effects that bias circular bootstrap.
+3. Reports the 2.5th and 97.5th percentiles of the bootstrap SR distribution
+   as the 95% CI.
+
+**Block size selection:** set L ≈ mean holding period in bars.  For a daily
+strategy with a 5-day average holding period, use L = 5.  Default is ⌈√T⌉
+(Lahiri 2003 rule-of-thumb) when holding period is unknown.
+
+### Why not circular bootstrap?
+Circular bootstrap treats the return series as periodic, artificially
+wrapping the end back to the beginning.  This distorts the time structure of
+trend-following strategies near period boundaries, overstating precision.
+
+---
+
+## Stress-Window Analysis
+
+Every strategy that looks good on average may fail catastrophically in tail
+events.  We evaluate each named stress window explicitly:
+
+| Event | Window | Why it matters |
+|-------|---------|---------------|
+| COVID Crash | 2020-02-20 → 2020-03-13 | Flash deleveraging, -50% BTC in 3 weeks |
+| China Mining Ban | 2021-05-12 → 2021-05-20 | Hash rate collapse, forced selling |
+| LUNA Collapse | 2022-05-08 → 2022-05-15 | De-peg cascade, -99% LUNA, contagion |
+| FTX Collapse | 2022-11-06 → 2022-11-12 | Counter-party failure, -25% BTC in 6 days |
+| USDC Depeg | 2023-03-10 → 2023-03-13 | SVB failure → stablecoin crisis |
+| Yen Carry Unwind | 2024-08-02 → 2024-08-07 | Global risk-off, sharp BTC drawdown |
+
+For each window we report: total return, max intra-window drawdown, and
+annualised Sharpe over the window.
+
+**IS vs OOS labelling is mandatory.**  A stress loss on an in-sample window
+is expected and not informative.  A stress loss on an out-of-sample window
+proves the strategy has real traction in live market regimes.
+
+---
+
 ## References
 
 - Lopez de Prado, M. (2018). *Advances in Financial Machine Learning* (AFML)
@@ -112,4 +232,10 @@ For non-overlapping features or as a simpler baseline:
     - §7.4: Purged k-fold cross-validation
     - §12: Combinatorial purged cross-validation
 - Bailey, D. & Lopez de Prado, M. (2014). *The Deflated Sharpe Ratio*
+    - Eq. (2): PSR formula with skewness and kurtosis correction
+    - §4.3: Expected maximum SR under the null (SR* formula)
+    - Table 2: Reference values for DSR at various N and T
+- Politis, D. & Romano, J. (1994). *The Stationary Bootstrap*
+- Lahiri, S. N. (2003). *Resampling Methods for Dependent Data* — block size guidance
+- Lo, A. (2002). *The Statistics of Sharpe Ratios* — variance formula for non-IID returns
 - Chan, E. (2013). *Algorithmic Trading*

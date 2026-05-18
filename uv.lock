@@ -3378,9 +3378,11 @@ dependencies = [
 
 [package.optional-dependencies]
 backtest = [
+    { name = "arch" },
     { name = "empyrical-reloaded" },
     { name = "nautilus-trader" },
     { name = "quantstats" },
+    { name = "scipy" },
     { name = "vectorbt" },
 ]
 dev = [
@@ -3420,6 +3422,7 @@ ml = [
 
 [package.metadata]
 requires-dist = [
+    { name = "arch", marker = "extra == 'backtest'", specifier = ">=7.0,<8" },
     { name = "arch", marker = "extra == 'ml'", specifier = ">=7.0,<8" },
     { name = "asyncpg", specifier = "==0.31.0" },
     { name = "black", marker = "extra == 'dev'", specifier = "==25.12.0" },
@@ -3455,6 +3458,7 @@ requires-dist = [
     { name = "redis", specifier = "==5.3.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.13" },
     { name = "scikit-learn", specifier = "==1.8.0" },
+    { name = "scipy", marker = "extra == 'backtest'", specifier = ">=1.14,<2" },
     { name = "shap", marker = "extra == 'ml'", specifier = ">=0.46,<1" },
     { name = "stable-baselines3", marker = "extra == 'ml'", specifier = ">=2.4,<3" },
     { name = "structlog", specifier = "==25.5.0" },

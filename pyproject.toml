@@ -43,6 +43,8 @@ backtest = [
     "vectorbt>=0.26,<1",
     "quantstats>=0.0.64,<1",
     "empyrical-reloaded>=0.5.11,<1",
+    "arch>=7.0,<8",
+    "scipy>=1.14,<2",
 ]
 # mlfinlab requires Hudson & Thames private index:
 # UV_EXTRA_INDEX_URL=https://pypi.hudsonthames.org/simple/
@@ -154,7 +156,7 @@ module = ["tessera.features.*"]
 disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore", "assignment", "type-var"]
 
 [[tool.mypy.overrides]]
-module = ["tessera.strategies.*", "tessera.backtest.*"]
+module = ["tessera.strategies.*", "tessera.backtest.*", "tessera.backtest.reports.*"]
 disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-value", "call-overload", "no-any-return", "unused-ignore", "assignment", "call-arg", "import-not-found"]
 
 [[tool.mypy.overrides]]
@@ -169,6 +171,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+]
 
 [tool.coverage.run]
 source = ["tessera"]

@@ -744,6 +744,103 @@ def backtest_run(
     raise typer.Exit()
 
 
+report_app = typer.Typer(help="Generate performance evaluation reports.")
+app.add_typer(report_app, name="report")
+
+
+@report_app.command("backtest")
+def report_backtest(
+    run_id: str = typer.Option(
+        ..., "--run-id", help="Backtest run ID (reads from data/backtest_runs/<run_id>/)"
+    ),
+    output: str = typer.Option("docs/figures/", "--output", help="Output directory"),
+    n_trials: int = typer.Option(100, "--n-trials", help="Total trial count (Optuna + manual)"),
+    benchmark_path: str | None = typer.Option(
+        None, "--benchmark", help="Parquet path for benchmark daily returns"
+    ),
+    test_start: str | None = typer.Option(
+        None, "--test-start", help="First OOS date (YYYY-MM-DD) for IS/OOS labelling"
+    ),
+    n_bootstrap: int = typer.Option(10_000, "--n-bootstrap", help="Bootstrap resamples for SR CI"),
+    sr_std: float | None = typer.Option(
+        None, "--sr-std", help="Cross-trial SR std (default: 1/√T)"
+    ),
+) -> None:
+    """Generate a full evaluation report for a completed backtest run.
+
+    Reads equity_curve.parquet and summary.json from the run directory and
+    produces an enhanced QuantStats HTML tearsheet with DSR, PSR, bootstrap CI,
+    and stress-window PnLs written to <output>/<run_id>_report.html.
+    """
+    import json
+    from pathlib import Path
+
+    settings, _ = _bootstrap()
+    log = structlog.get_logger("tessera.cli.report")
+
+    run_dir = settings.data_root / "backtest_runs" / run_id
+    if not run_dir.exists():
+        typer.echo(f"Run directory not found: {run_dir}", err=True)
+        raise typer.Exit(1)
+
+    equity_path = run_dir / "equity_curve.parquet"
+    if not equity_path.exists():
+        typer.echo(f"equity_curve.parquet not found in {run_dir}", err=True)
+        raise typer.Exit(1)
+
+    equity = pd.read_parquet(equity_path)["equity"]
+    returns = equity.pct_change().dropna()
+    returns.index = pd.to_datetime(returns.index)
+
+    summary_path = run_dir / "summary.json"
+    title = f"Tessera Backtest — {run_id}"
+    if summary_path.exists():
+        with open(summary_path) as f:
+            summary = json.load(f)
+        sr_point = summary.get("sharpe_ratio", None)
+        title = (
+            f"Tessera Backtest — {run_id} "
+            f"[{summary.get('start_date', '')} → {summary.get('end_date', '')}]"
+        )
+    else:
+        sr_point = None
+
+    benchmark_returns: pd.Series | None = None
+    if benchmark_path:
+        try:
+            bm_df = pd.read_parquet(benchmark_path)
+            benchmark_returns = bm_df.iloc[:, 0] if isinstance(bm_df, pd.DataFrame) else bm_df
+        except Exception as exc:
+            typer.echo(f"Warning: could not load benchmark: {exc}", err=True)
+
+    from tessera.backtest.reports.tearsheet import generate_tearsheet
+
+    output_dir = Path(output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / f"{run_id}_report.html"
+
+    manual_metrics: dict[str, object] | None = None
+    if sr_point is not None:
+        manual_metrics = {"point_sr": sr_point}
+
+    log.info("report_start", run_id=run_id, n_trials=n_trials, output=str(output_file))
+    typer.echo(f"Generating report for run {run_id!r}…")
+
+    out = generate_tearsheet(
+        returns=returns,
+        benchmark_returns=benchmark_returns,
+        output_path=output_file,
+        trial_count=n_trials,
+        manual_metrics_to_overlay=manual_metrics,
+        sr_std=sr_std,
+        n_bootstrap=n_bootstrap,
+        test_start_date=test_start,
+        title=title,
+    )
+    typer.echo(f"Report written: {out}")
+    raise typer.Exit()
+
+
 @app.command()
 def paper() -> None:
     """Run paper trading (live data, simulated execution)."""

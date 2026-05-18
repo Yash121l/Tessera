@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup fmt lint test backtest paper docs help
+.PHONY: setup fmt lint test ci backtest paper docs help
 
 setup: ## Install deps + pre-commit hooks
 	uv sync --all-extras
@@ -17,6 +17,8 @@ lint: ## Lint + typecheck
 
 test: ## Run tests with coverage
 	uv run pytest --cov=tessera --cov-report=term-missing
+
+ci: fmt lint test ## Run full CI pipeline (fmt → lint → test); must be green before commit
 
 backtest: ## Run backtest
 	uv run tessera backtest
