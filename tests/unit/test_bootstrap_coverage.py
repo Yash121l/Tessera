@@ -16,7 +16,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tessera.backtest.reports.bootstrap import _annualized_sharpe, block_bootstrap_sharpe
+pytest.importorskip("arch", reason="requires ml/backtest extra: uv sync --extra ml")
+
+from tessera.backtest.reports.bootstrap import (  # noqa: E402
+    _annualized_sharpe,
+    block_bootstrap_sharpe,
+)
 
 # ---------------------------------------------------------------------------
 # Unit tests for the helper
