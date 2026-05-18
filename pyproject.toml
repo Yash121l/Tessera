@@ -49,6 +49,11 @@ backtest = [
 # mlfinlab requires Hudson & Thames private index:
 # UV_EXTRA_INDEX_URL=https://pypi.hudsonthames.org/simple/
 # mlfinlab = ["mlfinlab>=2.2"]
+sequence = [
+    "pytorch-forecasting>=1.0,<2",
+    "lightning>=2.4,<3",
+    "chronos-forecasting[torch]>=1.3,<2",
+]
 dev = [
     "pytest==8.4.2",
     "pytest-cov==6.3.0",
@@ -161,6 +166,14 @@ disable_error_code = ["misc", "operator", "attr-defined", "arg-type", "return-va
 
 [[tool.mypy.overrides]]
 module = ["matplotlib", "matplotlib.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pytorch_forecasting", "pytorch_forecasting.*", "lightning", "lightning.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["chronos", "chronos.*"]
 ignore_missing_imports = true
 
 # Add more [[tool.mypy.overrides]] as optional deps get imported:

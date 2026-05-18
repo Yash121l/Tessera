@@ -113,10 +113,12 @@ class EnsembleModel(Model):
     @classmethod
     def load(cls, path: Path) -> Self:
         from tessera.models.lightgbm_model import MetaLightGBMModel, PrimaryLightGBMModel
+        from tessera.models.patchtst import PatchTSTModel
 
         _registry: dict[str, type[Model]] = {
             "PrimaryLightGBMModel": PrimaryLightGBMModel,
             "MetaLightGBMModel": MetaLightGBMModel,
+            "PatchTSTModel": PatchTSTModel,
         }
 
         meta = json.loads((path / "ensemble_meta.json").read_text())

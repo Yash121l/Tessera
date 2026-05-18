@@ -224,6 +224,87 @@ proves the strategy has real traction in live market regimes.
 
 ---
 
+---
+
+## Why We Did Not Adopt Foundation Time-Series Models
+
+**Phase 9 empirical finding** — Chronos zero-shot underperforms the LightGBM baseline.
+The full comparison table is in `docs/PHASE_9_REPORT.md`.
+
+### What we tested
+
+| Model | Description | OOS Sharpe (annualised) |
+|-------|-------------|------------------------|
+| LightGBM (baseline) | Tabular gradient boosting on microstructure features | reference |
+| PatchTST | Patch transformer, lookback=60, 5M-param budget | see report |
+| TFT | Temporal Fusion Transformer via pytorch-forecasting | see report |
+| Chronos-Bolt-Base | Pre-trained foundation model, zero-shot | see report |
+
+### Why Chronos underperforms
+
+Chronos (Ansari et al., 2024) is a T5-based model pre-trained on thousands of
+heterogeneous public time series (M4, ETT, electricity, weather, …). Its inductive
+biases are:
+
+1. **Long-horizon, smooth signal**: the pre-training data has trends and seasonalities
+   at daily/weekly scales. 5-minute crypto returns are near-white-noise at any horizon
+   longer than a few bars.
+
+2. **Mean-reversion prior**: Chronos implicitly learns that most series revert toward
+   their local mean. This is the correct prior for energy consumption or retail sales,
+   but it produces predominantly flat signals for perpetual futures, where funding-rate
+   and order-flow momentum dominate.
+
+3. **No microstructure inputs**: Chronos is strictly univariate and sees only the
+   return series. It cannot condition on VPIN, order-flow imbalance, funding-rate
+   Z-scores, or cross-sectional momentum — the features that drive the LightGBM edge.
+
+4. **Distributional mismatch without fine-tuning**: fine-tuning would partially bridge
+   the gap, but it defeats the zero-shot premise and introduces the same look-ahead
+   risk as any supervised model.
+
+### Why PatchTST does not dominate LightGBM
+
+PatchTST (Nie et al., 2023) was designed for **long-horizon univariate forecasting**
+where local temporal context is crucial (e.g., predicting traffic demand 96 steps ahead).
+For our task:
+
+- **Features already encode history**: log-returns, VPIN, realized vol, and
+  cross-sectional ranks all summarise recent bar history into a single number.
+  The transformer's lookback adds redundant context beyond what the features already
+  capture.
+- **Short effective lookback**: at 5-min resolution, predictive information decays
+  within a few bars (empirically ~5–15 bars in AFML §3 studies). A 60-bar window
+  is mostly noise after bar 15.
+- **Training overhead**: PatchTST requires GPU for practical training times and adds
+  pytorch as a hard dependency. LightGBM trains on CPU in seconds.
+- **Deflated Sharpe**: after correcting for the number of hyperparameter trials,
+  PatchTST's DSR is lower than LightGBM's because the raw SR improvement is small
+  relative to the search space explored.
+
+### Why TFT does not apply cleanly
+
+TFT was designed for **multi-horizon probabilistic forecasting** with both
+static metadata and known-future covariates (e.g., holiday calendars). Adapting it
+to single-step classification requires treating triple-barrier labels {-1, 0, +1}
+as a continuous target and rounding quantile forecasts — a structural mismatch that
+TFT's gating mechanisms are not designed to handle.
+
+### Conclusion
+
+> Sequence models are not rejected categorically. If Tessera migrates to a regime
+> where raw order-book data (Level 2 depth snapshots) is the primary signal,
+> a convolutional sequence model trained end-to-end on tick data could be competitive.
+> At the current feature abstraction level (engineered tabular features at 5-min
+> resolution), the transformer adds complexity without adding signal.
+
+We re-evaluate this decision whenever:
+- A new model achieves DSR ≥ 0.95 on the held-out OOS period with ≤ 100 Optuna trials.
+- We move to tick-level feature engineering.
+- LightGBM's OOS Sharpe degrades below 0.2 (possible regime change).
+
+---
+
 ## References
 
 - Lopez de Prado, M. (2018). *Advances in Financial Machine Learning* (AFML)
