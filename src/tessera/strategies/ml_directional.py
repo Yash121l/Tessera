@@ -29,6 +29,11 @@ from nautilus_trader.model.enums import OrderSide, TimeInForce
 from nautilus_trader.model.identifiers import InstrumentId
 
 from tessera.backtest.slippage import OHLCVSlippageModel
+from tessera.risk.circuit_breaker import CircuitBreaker
+from tessera.risk.kelly import kelly_from_meta_prob
+from tessera.risk.kill_switch import KillSwitch, KillSwitchConfig
+from tessera.risk.limits import PositionLimits
+from tessera.risk.vol_target import vol_target_scalar
 from tessera.strategies.base import TesseraBaseStrategy, TesseraStrategyConfig
 
 logger = structlog.get_logger(__name__)
@@ -36,22 +41,27 @@ logger = structlog.get_logger(__name__)
 _SECS_PER_YEAR = 365.25 * 24 * 3600
 _NS_PER_SEC = 1_000_000_000
 
-# Minimum volatility to avoid division-by-zero in Kelly sizing
 _MIN_VOL = 0.001
-# Minimum number of bars in buffer before generating a signal
 _MIN_HISTORY = 60
 
 
 class MLDirectionalConfig(TesseraStrategyConfig, frozen=True):
     """Configuration for MLDirectionalStrategy."""
 
-    primary_model_path: str = ""  # Path to primary LightGBM model dir
-    meta_model_path: str = ""  # Empty string = no meta model
-    feature_lookback: int = 300  # bars to keep in buffer
-    adv_lookback: int = 1440  # bars used to estimate ADV for slippage
+    primary_model_path: str = ""
+    meta_model_path: str = ""
+    feature_lookback: int = 300
+    adv_lookback: int = 1440
     slippage_k: float = 1.0
     half_spread_bps: float = 2.5
-    min_trade_notional: float = 10.0  # USD; below this, skip rebalance
+    min_trade_notional: float = 10.0
+
+    # Risk stack
+    risk_db_dsn: str = ""  # Postgres DSN for CircuitBreaker; empty = in-memory
+    daily_loss_threshold: float = 0.03
+    drawdown_kill_threshold: float = 0.08
+    data_gap_seconds: float = 30.0
+    order_reject_threshold: float = 0.05
 
 
 class MLDirectionalStrategy(TesseraBaseStrategy):
@@ -66,18 +76,29 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
         self._ml_cfg = config
         self._primary_model: Any = None
         self._meta_model: Any = None
-        # bar buffers: instrument_id str → deque[dict]
         self._bar_buffers: dict[str, deque[dict[str, float]]] = {}
-        # pending signals: instrument_id str → deque[(signal, bar_count_remaining)]
         self._delayed_signals: dict[str, deque[tuple[int, float, int]]] = {}
         self._bar_counter: dict[str, int] = {}
-        # per-symbol pending limit order id (str)
         self._pending_limit: dict[str, str | None] = {}
         self._pending_limit_bars: dict[str, int] = {}
         self._slippage = OHLCVSlippageModel(
             k=config.slippage_k,
             half_spread_bps=config.half_spread_bps,
         )
+
+        # Risk stack — wired in order: kelly → vol_target → limits → cb → ks
+        self._kill_switch = KillSwitch(
+            config=KillSwitchConfig(
+                daily_loss_threshold=config.daily_loss_threshold,
+                drawdown_threshold=config.drawdown_kill_threshold,
+                data_gap_seconds=config.data_gap_seconds,
+                reject_rate_threshold=config.order_reject_threshold,
+            ),
+            on_trigger=self._on_kill_switch_trigger,
+        )
+        self._circuit_breaker = CircuitBreaker(dsn=config.risk_db_dsn or None)
+        self._position_limits = PositionLimits(max_asset_pct=config.max_position_pct)
+        self._mtd_start_equity: float | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -112,6 +133,10 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
                 self._meta_model = MetaLGBM.load(meta_path)
                 logger.info("meta_model_loaded", path=str(meta_path))
 
+    def _on_kill_switch_trigger(self, trigger: Any, detail: str) -> None:
+        logger.critical("kill_switch_flattening_all", trigger=str(trigger), detail=detail)
+        self._flatten_all()
+
     # ------------------------------------------------------------------
     # Bar handler
     # ------------------------------------------------------------------
@@ -119,6 +144,25 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
     def _on_bar_impl(self, bar: Bar) -> None:
         id_str = str(bar.bar_type.instrument_id)
         instr_id = bar.bar_type.instrument_id
+
+        # Kill switch is source of truth — abort the entire cycle if active.
+        if self._kill_switch.is_active:
+            return
+        self._kill_switch.record_data_tick()
+        self._kill_switch.check_data_gap()
+
+        # Update circuit breaker with current equity.
+        venues = list({InstrumentId.from_str(s).venue for s in self._cfg.instrument_ids})
+        equity = sum(self._current_equity(str(v)) for v in venues) or 100_000.0
+        if self._mtd_start_equity is None:
+            self._mtd_start_equity = equity
+        self._circuit_breaker.update(equity, mtd_start_equity=self._mtd_start_equity)
+
+        # Equity-based kill switch checks.
+        self._kill_switch.check_daily_loss(equity)
+        self._kill_switch.check_drawdown(equity)
+        if self._kill_switch.is_active:
+            return
 
         # Accumulate bar into buffer
         self._bar_buffers[id_str].append(
@@ -275,6 +319,7 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
             post_only=True,
         )
         self.submit_order(order)
+        self._kill_switch.record_order_event(rejected=False)
         self._pending_limit[id_str] = str(order.client_order_id)
         self._pending_limit_bars[id_str] = 0
         logger.debug(
@@ -288,8 +333,11 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
         )
 
     def _kelly_target_qty(self, signal: int, meta_prob: float, id_str: str, price: float) -> float:
-        """Target position quantity using fractional Kelly + vol targeting."""
-        if signal == 0:
+        """Target position quantity via kelly → vol_target → limits → circuit_breaker.
+
+        Returns 0 immediately if the kill switch is active.
+        """
+        if signal == 0 or self._kill_switch.is_active:
             return 0.0
 
         buf = list(self._bar_buffers[id_str])
@@ -301,21 +349,34 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
         bar_vol = max(float(log_ret.std()), _MIN_VOL / math.sqrt(1440))
         annual_vol = bar_vol * math.sqrt(1440)
 
-        # Vol target scalar: shrinks position when vol is high
-        vol_scalar = min(self._cfg.vol_target_pct / annual_vol, 3.0)
+        # 1. Kelly fraction from meta-model probability.
+        #    Expected return ≈ daily vol; expected loss ≈ half that (2:1 R/R target).
+        daily_vol = annual_vol / math.sqrt(252)
+        kelly_frac = kelly_from_meta_prob(
+            p_meta=meta_prob,
+            expected_return=daily_vol,
+            expected_loss=0.5 * daily_vol,
+            fraction=self._cfg.kelly_fraction,
+        )
 
-        # Confidence from meta model: map meta_prob ∈ [0,1] → confidence ∈ [-1,1]
-        confidence = 2.0 * meta_prob - 1.0  # [0,1] → [-1,1]
+        # 2. Vol-target scalar — scale down when vol is high, up when low.
+        vt_scalar = vol_target_scalar(annual_vol, target_vol_annual=self._cfg.vol_target_pct)
 
-        # Portfolio equity estimate
-        venues = [InstrumentId.from_str(s).venue for s in self._cfg.instrument_ids]
-        equity = sum(self._current_equity(str(v)) for v in set(venues)) or 100_000.0
+        # 3. Portfolio equity.
+        venues = list({InstrumentId.from_str(s).venue for s in self._cfg.instrument_ids})
+        equity = sum(self._current_equity(str(v)) for v in venues) or 100_000.0
 
-        max_notional = equity * self._cfg.max_position_pct
-        kelly_notional = self._cfg.kelly_fraction * confidence * vol_scalar * equity
-        notional = min(abs(kelly_notional), max_notional)
-        qty = notional / price
-        return signal * qty
+        # 4. Circuit breaker size multiplier (1.0, 0.5, or 0.0).
+        cb_mult = self._circuit_breaker.size_multiplier
+
+        raw_notional = kelly_frac * vt_scalar * cb_mult * equity
+
+        # 5. Position limits — clip to per-asset and gross/net caps.
+        raw_positions = {id_str: float(signal) * raw_notional}
+        clipped = self._position_limits.clip_to_limits(raw_positions, nav=equity)
+        notional = clipped.get(id_str, 0.0)
+
+        return notional / price if price > 0.0 else 0.0
 
     def _estimate_adv_notional(self, id_str: str) -> float:
         buf = list(self._bar_buffers[id_str])
