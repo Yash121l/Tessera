@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup fmt lint test ci backtest paper docs help
+.PHONY: setup fmt lint test ci backtest figures paper docs help
 
 setup: ## Install deps + pre-commit hooks
 	uv sync --all-extras
@@ -20,13 +20,16 @@ test: ## Run tests with coverage
 
 ci: fmt lint test ## Run full CI pipeline (fmt → lint → test); must be green before commit
 
-backtest: ## Run backtest
+backtest: ## Run walk-forward backtest; outputs to data/backtest_runs/
 	uv run tessera backtest
 
-paper: ## Run paper-trade
-	uv run tessera paper
+figures: ## Regenerate all paper + docs figures from data
+	uv run python paper/figures/generate_all.py
 
-docs: ## Serve docs locally
+paper: ## Run live paper-trade (Binance Testnet + Bybit Demo)
+	uv run tessera paper start --config configs/live.yaml
+
+docs: ## Serve MkDocs docs locally at http://localhost:8000
 	uv run mkdocs serve
 
 help: ## Show this help

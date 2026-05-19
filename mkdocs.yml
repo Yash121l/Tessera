@@ -1,6 +1,7 @@
 site_name: Tessera
 site_description: Mid-frequency ML trading system for crypto perpetual futures
 repo_url: https://github.com/Yash121l/Tessera
+repo_name: Yash121l/Tessera
 
 theme:
   name: material
@@ -8,25 +9,55 @@ theme:
     - scheme: default
       primary: indigo
       accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   features:
     - navigation.sections
     - navigation.expand
+    - navigation.top
     - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - search.suggest
 
 nav:
   - Home: index.md
   - Architecture: architecture.md
   - Methodology: methodology.md
+  - Features: features.md
+  - Models: models.md
+  - Results: results.md
   - Runbook: runbook.md
+  - Pitfalls: pitfalls.md
 
 plugins:
   - search
 
 markdown_extensions:
-  - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.tabbed:
+      alternate_style: true
   - admonition
+  - attr_list
+  - tables
   - toc:
       permalink: true
+
+extra_javascript:
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

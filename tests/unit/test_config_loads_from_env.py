@@ -58,7 +58,21 @@ def test_settings_list_fields() -> None:
 
 def test_settings_optional_fields_none() -> None:
     """Optional fields should be None when not set."""
-    settings = TesseraSettings()
+    keys_to_clear = [
+        "TESSERA_BINANCE_API_KEY",
+        "TESSERA_BINANCE_API_SECRET",
+        "TESSERA_BYBIT_API_KEY",
+        "TESSERA_BYBIT_API_SECRET",
+        "TESSERA_TARDIS_API_KEY",
+        "TESSERA_SENTRY_DSN",
+    ]
+    # Remove the keys from the environment entirely and skip .env file loading
+    # so the fields remain at their default=None.
+    saved = {k: os.environ.pop(k) for k in keys_to_clear if k in os.environ}
+    try:
+        settings = TesseraSettings(_env_file=None)  # type: ignore[call-arg]
+    finally:
+        os.environ.update(saved)
     assert settings.binance_api_key is None
     assert settings.bybit_api_key is None
     assert settings.tardis_api_key is None

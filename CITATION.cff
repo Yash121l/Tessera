@@ -1,12 +1,45 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
-title: "Tessera"
-abstract: "Mid-frequency ML trading system for crypto perpetual futures"
+title: "Tessera: A Mid-Frequency ML Trading System for Crypto Perpetual Futures"
+abstract: >
+  Tessera is an end-to-end, publicly reproducible mid-frequency ML trading
+  system for USDT-margined crypto perpetual futures on Binance and Bybit.
+  It covers raw OHLCV ingestion, microstructure feature engineering
+  (VPIN, OFI, microprice), triple-barrier labeling (AFML §3),
+  uniqueness-weighted samples (AFML §4), LightGBM primary and meta-label
+  models, PatchTST and Chronos zero-shot baselines, Combinatorial Purged
+  Cross-Validation, deflated Sharpe validation, a quarter-Kelly risk stack
+  with circuit breakers, and Nautilus Trader live paper trading.
 authors:
   - family-names: "Lunawat"
     given-names: "Yash"
+    email: "yash.l23csai@nst.rishihood.edu.in"
+    affiliation: "Rishihood University, Sonipat, India"
 version: "0.1.0"
-date-released: "2026-05-17"
+date-released: "2026-05-19"
 license: MIT
 repository-code: "https://github.com/Yash121l/Tessera"
+keywords:
+  - machine learning
+  - algorithmic trading
+  - cryptocurrency
+  - perpetual futures
+  - time series
+  - financial machine learning
+  - microstructure
+  - LightGBM
+  - meta-labeling
+  - Nautilus Trader
+
+# ── Zenodo deposit instructions (manual — do not automate) ─────────────────
+#
+# 1. Ensure a GitHub release exists at the target version tag (e.g. v0.1.0).
+# 2. Go to https://zenodo.org and connect your GitHub account.
+# 3. Enable the Tessera repository under "GitHub" in Zenodo settings.
+# 4. Push the release tag to GitHub — Zenodo will automatically create a
+#    deposit and assign a DOI.
+# 5. Update this file: add the doi field below.
+# 6. Update paper/main.tex to include the Zenodo DOI in the citation.
+#
+# doi: "10.5281/zenodo.XXXXXXX"   ← fill in after Zenodo deposit

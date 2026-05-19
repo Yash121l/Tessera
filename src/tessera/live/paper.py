@@ -200,7 +200,7 @@ class PaperRunner:
         try:
             from nautilus_trader.config import (
                 LiveDataEngineConfig,
-                LiveExecutionEngineConfig,
+                LiveExecEngineConfig,
                 LiveRiskEngineConfig,
                 LoggingConfig,
                 TradingNodeConfig,
@@ -238,7 +238,7 @@ class PaperRunner:
             try:
                 from nautilus_trader.adapters.binance.factories import (
                     BinanceLiveDataClientFactory,
-                    BinanceLiveExecutionClientFactory,
+                    BinanceLiveExecClientFactory,
                 )
                 from nautilus_trader.adapters.binance.futures.config import (
                     BinanceFuturesDataClientConfig,
@@ -256,7 +256,7 @@ class PaperRunner:
                     is_testnet=True,
                 )
                 factories_data["BINANCE"] = BinanceLiveDataClientFactory
-                factories_exec["BINANCE"] = BinanceLiveExecutionClientFactory
+                factories_exec["BINANCE"] = BinanceLiveExecClientFactory
                 logger.info("binance_testnet_configured")
             except ImportError:
                 logger.warning("binance_adapter_not_available_skipping")
@@ -265,35 +265,34 @@ class PaperRunner:
             try:
                 from nautilus_trader.adapters.bybit.config import (
                     BybitDataClientConfig,
-                    BybitExecutionClientConfig,
+                    BybitExecClientConfig,
                 )
                 from nautilus_trader.adapters.bybit.factories import (
                     BybitLiveDataClientFactory,
-                    BybitLiveExecutionClientFactory,
+                    BybitLiveExecClientFactory,
                 )
 
                 data_clients["BYBIT"] = BybitDataClientConfig(
                     api_key=bybit_key,
                     api_secret=bybit_secret,
-                    is_testnet=True,
+                    testnet=True,
                 )
-                exec_clients["BYBIT"] = BybitExecutionClientConfig(
+                exec_clients["BYBIT"] = BybitExecClientConfig(
                     api_key=bybit_key,
                     api_secret=bybit_secret,
-                    is_testnet=True,
+                    testnet=True,
                 )
                 factories_data["BYBIT"] = BybitLiveDataClientFactory
-                factories_exec["BYBIT"] = BybitLiveExecutionClientFactory
+                factories_exec["BYBIT"] = BybitLiveExecClientFactory
                 logger.info("bybit_demo_configured")
             except ImportError:
                 logger.warning("bybit_adapter_not_available_skipping")
 
         node_config = TradingNodeConfig(
             trader_id=f"TESSERA-{self.run_id.upper()}",
-            log_level=self._settings.log_level,
             data_engine=LiveDataEngineConfig(debug=False),
             risk_engine=LiveRiskEngineConfig(),
-            exec_engine=LiveExecutionEngineConfig(),
+            exec_engine=LiveExecEngineConfig(),
             logging=LoggingConfig(log_level=self._settings.log_level),
             data_clients=data_clients,
             exec_clients=exec_clients,
@@ -307,7 +306,7 @@ class PaperRunner:
             node.add_exec_client_factory(venue, factory)
 
         strategy = self._build_strategy(cfg.symbols)
-        node.add_strategy(strategy)
+        node.trader.add_strategy(strategy)
         node.build()
         return node
 

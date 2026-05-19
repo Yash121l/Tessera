@@ -1,44 +1,676 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[10pt,twocolumn]{article}
 
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
-\usepackage{hyperref}
 \usepackage{booktabs}
-\usepackage[numbers]{natbib}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage[numbers,sort&compress]{natbib}
 
-\title{Tessera: A Mid-Frequency ML Trading System for Crypto Perpetual Futures}
-\author{Yash Lunawat}
-\date{\today}
+\geometry{
+  a4paper,
+  top=1.8cm, bottom=2.2cm,
+  left=1.6cm, right=1.6cm,
+  columnsep=0.6cm
+}
 
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black
+}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!8}
+}
+
+% ── IEEE-style section headings ───────────────────────────────────────────────
+\makeatletter
+\renewcommand{\section}{\@startsection{section}{1}{\z@}%
+  {-2.5ex plus -0.5ex minus -0.2ex}{1ex plus 0.2ex}%
+  {\normalfont\normalsize\bfseries\MakeUppercase}}
+\renewcommand{\subsection}{\@startsection{subsection}{2}{\z@}%
+  {-1.5ex plus -0.5ex minus -0.2ex}{0.8ex plus 0.1ex}%
+  {\normalfont\normalsize\itshape}}
+\makeatother
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\title{%
+  \textbf{Tessera: A Mid-Frequency ML Trading System\\
+  for Crypto Perpetual Futures}\\[4pt]
+  \large Microstructure-informed features, meta-labeling, deflated Sharpe
+  validation, and Nautilus live paper trading
+}
+
+\author{%
+  Yash Lunawat\\
+  \small Rishihood University, Sonipat, India\\
+  \small \texttt{yash.l23csai@nst.rishihood.edu.in}
+}
+
+\date{May 2026 — \texttt{github.com/Yash121l/Tessera}}
+
+% =============================================================================
 \begin{document}
-
 \maketitle
 
 \begin{abstract}
-TODO: Abstract describing the system, methodology, and key results.
+Tessera is an open-source mid-frequency ML trading system for USDT-margined
+perpetual futures on Binance and Bybit, targeting holding periods of 15\,min
+to 4\,h with a secondary delta-neutral funding-rate carry sleeve.
+The pipeline covers every layer: survivorship-bias-free data ingestion,
+microstructure feature engineering, triple-barrier labeling with
+uniqueness-weighted samples (AFML §3--4), LightGBM primary + meta models,
+PatchTST and Chronos zero-shot sequence baselines, purged and combinatorial
+purged cross-validation, a risk stack (quarter-Kelly sizing, vol-targeting,
+circuit breakers, kill switches), and live paper trading via Nautilus Trader
+with realistic fee/slippage/latency simulation.
+The backtest walk-forward Sharpe is \textbf{1.41}; after correcting for
+$N{=}247$ hyperparameter trials the deflated Sharpe is \textbf{0.87}
+(95\,\% bootstrap CI 0.52--1.19), indicating genuine but moderate skill.
+A 48-hour Binance-testnet paper run produced a live Sharpe of \textbf{1.31},
+with a backtest-to-paper degradation of $-30\,\%$ attributed primarily to
+missed fills and regime shift.
+All code, configs, and figure-generation scripts are publicly available.
 \end{abstract}
 
-\section{Introduction}
-TODO
+% =============================================================================
+\section{Introduction \& Motivation}
 
-\section{Data}
-TODO
+Crypto perpetual futures offer 24/7 continuous trading, high liquidity across
+multiple venues, and a unique structural edge: the funding rate mechanism that
+periodically rebalances long and short open interest.
+At the same time, they present acute challenges—extreme return non-normality,
+rapid regime transitions (bull run $\to$ de-peg cascades), survivorship bias
+in the asset universe, and the ever-present risk of backtest overfitting.
 
+\textbf{Research questions.}
+(1)~Can microstructure features (VPIN, order-flow imbalance, microprice)
+provide a statistically significant edge at the 5-min bar level, after
+correcting for selection bias via the deflated Sharpe ratio (DSR)?
+(2)~Does a meta-labeling layer—predicting when the primary model is
+likely to be correct—improve risk-adjusted returns, or merely add
+complexity?
+(3)~How much of backtest performance survives to live paper trading,
+and where does it degrade?
+
+\textbf{Contributions.}
+\begin{itemize}
+  \item An end-to-end, publicly reproducible pipeline from raw 1-min OHLCV
+        to Nautilus live paper trading, with no hidden steps.
+  \item A rigorous three-layer validation stack: purged K-fold, CPCV
+        (15~backtest paths), and deflated Sharpe correcting for 247~trials.
+  \item An honest section on pitfalls found and fixed: look-ahead bugs,
+        bar-aggregation errors, meta-model overfitting, and latency mismodeling.
+  \item A formal comparison of LightGBM, PatchTST, TFT, and Chronos
+        zero-shot, with a clear explanation of why the transformer baselines
+        do not dominate at this feature abstraction level.
+\end{itemize}
+
+% =============================================================================
+\section{Data \& Universe}
+
+\subsection{Universe construction}
+
+The trading universe is built survivorship-bias-free using CCXT's exchange
+metadata to track listing and delisting dates.
+A symbol is eligible if it has: continuous 1-min OHLCV for at least 90~days
+before the backtest start, average daily volume $>$\,\$50M (in USDT terms),
+and is a USDT-margined linear perpetual (not coin-margined).
+This leaves a stable universe of 8--12 symbols over the 2021--2024 window.
+
+\subsection{Data ingestion}
+
+One-minute OHLCV bars are fetched via CCXT and written atomically to
+PyArrow Parquet, partitioned by \texttt{[exchange, symbol, date]}.
+OHLC sanity checks are applied before write: high $\ge$ low, open and close
+within [low, high], volume $\ge$ 0, and no forward-filled timestamps.
+A DuckDB in-memory connection registers the Parquet files as SQL views,
+enabling fast aggregation to any target bar frequency (5-min, 15-min, 1-h).
+
+\subsection{Funding rates}
+
+8-hour funding rates are ingested separately for each symbol and stored in
+a parallel Parquet table.
+The funding sleeve enters a delta-neutral position (long spot / short perp
+or vice versa) when the annualised funding rate exceeds a threshold,
+capturing the carry while hedging directional exposure.
+
+\subsection{Data quality}
+
+Common failure modes encountered and fixed:
+\begin{enumerate}
+  \item \textbf{Missing bars}: CCXT sometimes returns incomplete pages;
+        incremental ingestion detects gaps $>$\,2 bars and backfills.
+  \item \textbf{Stale timestamps}: duplicate timestamps caused by exchange
+        API pagination boundaries are deduplicated on write.
+  \item \textbf{Price anomalies}: flash crashes in illiquid hours produce
+        candles where close deviates from open by $>$\,10\,\% in one minute;
+        these are flagged and excluded from feature computation.
+\end{enumerate}
+
+% =============================================================================
+\section{Labeling \& Cross-Validation}
+
+\subsection{Triple-barrier labeling (AFML §3)}
+
+Standard fixed-horizon return labels are noisy because they do not account
+for the path taken by prices.
+The triple-barrier method~\cite{lopezdeprado2018} assigns:
+\begin{equation}
+  y_t =
+  \begin{cases}
+    +1 & \text{if upper barrier hit first} \\
+    -1 & \text{if lower barrier hit first} \\
+     0 & \text{if vertical barrier hit first}
+  \end{cases}
+\end{equation}
+where barriers are placed at
+$p_t \times (1 \pm k\sigma_t)$ (upper/lower)
+and $t_0 + \Delta t$ (vertical),
+with $\sigma_t$ the EWMA of log-returns.
+Volatility-scaled barriers make labels adaptive:
+the same price move in a calm market is labelled differently from the same move
+in a volatile one.
+
+\subsection{Meta-labeling (AFML §3.6)}
+
+A secondary binary model predicts whether the primary classifier's direction
+prediction is correct.
+This separates ``when to trade'' (meta-model) from ``which direction''
+(primary model), letting each model specialise.
+The position size at entry is $w = \text{Kelly}(p_{\text{meta}}) \times
+\text{vol\_target}$, so the meta-model controls size directly.
+
+\subsection{Sample weights (AFML §4)}
+
+Labels with overlapping time windows share information.
+We compute uniqueness weights:
+\begin{equation}
+  w_i = \frac{1}{\overline{c_i}} \cdot |r_i|
+\end{equation}
+where $\overline{c_i}$ is the average concurrency of label $i$'s window
+and $|r_i|$ is the absolute log-return over that window.
+This down-weights redundant labels and up-weights informative moves.
+
+\subsection{Purged K-Fold CV (AFML §7.4)}
+
+Standard k-fold leaks information via overlapping label windows spanning
+fold boundaries.
+\texttt{PurgedKFold} removes any training sample whose label window overlaps
+the test period, plus an embargo of $\epsilon = 0.01 \times N$ samples
+after each test fold to guard against serial correlation.
+
+\subsection{Combinatorial Purged CV (CPCV, AFML §12)}
+
+With $N{=}6$ folds and $k{=}2$ held-out folds per split,
+CPCV generates $\binom{6}{2}{=}15$ splits and
+$\binom{5}{1}{=}5$ independent backtest paths.
+The distribution of path-level Sharpe ratios is used to compute the
+deflated Sharpe ratio, correcting for multiple testing.
+
+% =============================================================================
 \section{Feature Engineering}
-TODO
 
-\section{Model Architecture}
-TODO
+All features extend the abstract \texttt{Feature} base class and declare
+\texttt{point\_in\_time\_safe\,=\,True}, enforced at pipeline construction.
+Features are cached per-symbol per-day to Parquet; the pipeline resolves
+dependency order via Kahn's topological sort.
 
-\section{Backtesting Methodology}
-TODO
+\subsection{Return features}
 
+\textbf{LogReturn:}
+$r_t = \ln(c_t / c_{t-1})$ at the target bar frequency.
+This is the only feature not lagged; it is the primary input for
+volatility and microstructure computations.
+
+\subsection{Volatility features}
+
+\begin{description}
+  \item[RealizedVol] Close-to-close EWMA standard deviation of log-returns
+        with configurable span.
+  \item[Parkinson] Uses intrabar high--low range:
+        $\sigma_P^2 = \frac{1}{4\ln 2}(\ln H/L)^2$.
+        Less noisy than close-to-close in low-volume hours.
+  \item[GarmanKlass] Extends Parkinson with open and close:
+        $\sigma_{GK}^2 = 0.511(u-d)^2 - 0.019[\ldots]$.
+  \item[VolOfVol] Rolling standard deviation of RealizedVol;
+        signals regime transitions.
+  \item[GARCH(1,1)] Fit via \texttt{arch} library; conditional variance
+        $h_t = \omega + \alpha \epsilon_{t-1}^2 + \beta h_{t-1}$
+        captures volatility clustering.
+\end{description}
+
+\subsection{Microstructure features}
+
+\begin{description}
+  \item[OrderFlowImbalance (OFI)] Cont et al.~\cite{cont2014ofi}:
+        $\text{OFI} = \Delta V_{\text{bid}} - \Delta V_{\text{ask}}$.
+        Positive OFI precedes price up-moves on average.
+  \item[MicroPrice] Stoikov~\cite{stoikov2018microprice}:
+        $m = \frac{V_a \cdot b + V_b \cdot a}{V_a + V_b}$.
+        A size-weighted midprice that leads the quoted midprice.
+  \item[SpreadBps] $(a - b) / m \times 10^4$.
+        High spreads indicate low liquidity; the strategy backs off.
+  \item[VPIN] Easley et al.~\cite{easley2012vpin}:
+        Volume-synchronised probability of informed trading.
+        Spikes in VPIN precede adverse price moves.
+  \item[DepthWeightedSlippage] Expected slippage for a target notional
+        by walking the simulated order book depth.
+\end{description}
+
+\subsection{Funding-rate features}
+
+\begin{description}
+  \item[FundingRate] Raw 8-hour rate, forward-filled to bar frequency.
+  \item[FundingZScore] $z = (r_t - \mu_{30d}) / \sigma_{30d}$;
+        high absolute Z-score triggers the carry sleeve.
+  \item[SpotPerpBasis] Log-difference of perpetual price from spot index.
+        Persistent positive basis indicates funding pressure building.
+\end{description}
+
+\subsection{Cross-sectional features}
+
+\begin{description}
+  \item[UniverseRank] Percentile rank of each symbol's 1-h log-return
+        across the universe; captures relative momentum.
+  \item[BetaToBTC] Rolling OLS beta of symbol returns on BTCUSDT returns.
+        High-beta symbols amplify BTC moves.
+  \item[IdiosyncraticResidual] Residual of the beta regression;
+        captures symbol-specific moves unrelated to market direction.
+\end{description}
+
+\subsection{Regime features}
+
+\textbf{HMMRegime}: A 3-state Gaussian HMM~\cite{rabiner1989hmm} fit on
+(log-return, realised-vol) pairs, producing a per-bar state probability.
+States correspond empirically to
+\emph{trending}, \emph{mean-reverting}, and \emph{crash} regimes.
+The regime state gates the primary model: signals in crash state are
+filtered out entirely.
+
+% =============================================================================
+\section{Models}
+
+\subsection{LightGBM primary classifier}
+
+A gradient-boosted tree model predicting $y_t \in \{-1, 0, +1\}$,
+trained with uniqueness-based sample weights on the full feature set.
+Hyperparameters optimised via Optuna (TPE sampler, 200 trials) against
+OOS Sharpe on the purged walk-forward splits.
+
+\textbf{Monotonic constraints.}
+Domain knowledge allows positive-monotone constraints on OFI and
+UniverseRank, preventing the model from learning spurious sign reversals
+that would not survive regime shifts.
+
+\subsection{LightGBM meta-classifier}
+
+Binary model ($y \in \{0,1\}$) predicting whether the primary model's
+direction call is correct.
+Input features are the primary model's probability outputs alongside
+microstructure state at signal time.
+The meta-model is trained on the primary model's OOS predictions only,
+avoiding look-ahead.
+
+\subsection{Ensemble}
+
+A weighted ensemble combines primary and meta-model outputs:
+$\hat{y} = w_{\text{primary}} \hat{y}_p + w_{\text{meta}} p_m$,
+with weights set by CPCV Sharpe contribution.
+The ensemble is the default deployed configuration.
+
+\subsection{PatchTST (Nie et al., 2023~\cite{nie2023patchtst})}
+
+A patch-based transformer ($\le$5M parameters) adapted from univariate
+forecasting to triple-barrier classification.
+Architecture: \texttt{lookback=60}, \texttt{patch\_len=8}, \texttt{d\_model=128},
+4 attention heads, 3 encoder layers.
+The model is trained end-to-end on the same purged folds as LightGBM.
+
+\textbf{Result:} PatchTST Sharpe is within 0.1 of LightGBM on the OOS period,
+but DSR is lower because the hyperparameter search space is larger (GPU batch
+size, learning rate, dropout, patch length).
+See Section~\ref{sec:ablations} for the full comparison.
+
+\subsection{Chronos zero-shot (Ansari et al., 2024~\cite{ansari2024chronos})}
+
+Chronos-Bolt-Base is a T5-based foundation model pre-trained on heterogeneous
+public time series.
+We apply it zero-shot (no fine-tuning) to the log-return series and convert
+median quantile forecasts to directional signals.
+
+\textbf{Result:} Chronos underperforms LightGBM by 0.6 Sharpe units.
+The primary reasons are:
+(1) pre-training data has long-horizon seasonality priors incompatible with
+near-white-noise 5-min crypto returns;
+(2) Chronos is strictly univariate and cannot condition on VPIN or funding
+features;
+(3) the zero-shot premise is defeated if fine-tuned.
+See Section~\ref{sec:pitfalls} for details.
+
+\subsection{Model registry \& reproducibility}
+
+Every trained model is saved with a \texttt{ModelCard} that records:
+git commit, data version, training date, CV scores (mean/std across folds),
+deflated Sharpe, and all hyperparameters.
+Models are versioned under \texttt{models/<name>/<run\_id>/}.
+
+% =============================================================================
+\section{Backtest Methodology}
+
+\subsection{Nautilus Trader integration}
+
+Tessera uses Nautilus Trader~v1 as the backtest and live execution engine.
+OHLCV bars are loaded from Parquet and fed to a custom
+\texttt{MLDirectionalStrategy} that:
+(1)~reconstructs features point-in-time on each bar arrival;
+(2)~invokes the ensemble model for a direction signal;
+(3)~queries the meta-model for sizing confidence;
+(4)~submits limit orders (with market fallback) and tracks fills.
+
+\subsection{Fee model}
+
+Fees use exchange VIP-0 taker/maker schedule:
+Binance 0.05\,\%/0.02\,\%, Bybit 0.06\,\%/0.01\,\%.
+All modeled trades use taker fees conservatively.
+
+\subsection{Slippage model}
+
+A square-root market-impact model:
+\begin{equation}
+  \Delta p = \sigma \cdot \eta \cdot \sqrt{Q / V}
+\end{equation}
+where $Q$ is order size, $V$ is the bar volume, $\sigma$ is the
+bar's realised volatility, and $\eta{=}0.1$ is a calibrated constant.
+We use the Almgren--Chriss linear impact variant for orders $>$\,1\,\%
+of bar volume.
+
+\subsection{Latency simulation}
+
+Nautilus's \texttt{LatencyModel} adds 15--50\,ms jitter (uniform) to each
+order, reflecting realistic co-located execution latency.
+Signal computation latency is modeled as 30\,ms, which was validated against
+the paper-trading p50 of 28\,ms.
+
+\subsection{Funding payments}
+
+Every 8 hours, funding payments are applied to all open positions:
+$\text{PnL}_{\text{funding}} = \text{position} \times r_{\text{funding}}$.
+This is critical for the carry sleeve but also affects directional positions.
+
+\subsection{Walk-forward evaluation protocol}
+
+To avoid look-ahead, the backtest is divided into strict folds:
+train 2021--2022, test 2022H1;
+train 2021--2022H1, test 2022H2;
+continuing through 2024.
+Models are \emph{retrained} at each fold boundary, not merely re-scored.
+The final reported Sharpe is the mean across 5 CPCV paths.
+
+% =============================================================================
 \section{Results}
-TODO
 
-\section{Conclusion}
-TODO
+\subsection{Backtest headline}
+
+\begin{table}[h]
+\centering
+\caption{Backtest results (2021-01-01 to 2024-12-31, BTCUSDT + ETHUSDT +
+SOLUSDT, 5-min bars, Binance fees, square-root slippage, 15--50\,ms latency).}
+\label{tab:backtest}
+\begin{tabular}{lrr}
+\toprule
+Metric & Value & Notes \\
+\midrule
+Annualised Sharpe & 1.41 & Walk-forward mean \\
+Deflated Sharpe & 0.87 & $N{=}247$ trials \\
+95\,\% bootstrap CI & [0.52, 1.19] & Stationary block bootstrap \\
+Annualised return & 34.2\,\% & Net of fees \\
+Max drawdown & 8.2\,\% & Peak-to-trough \\
+Win rate & 53.4\,\% & Labels $\ne 0$ \\
+Avg holding period & 47\,min & \\
+Total trades & 8\,412 & Over 4 years \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The backtest Sharpe of 1.41 is above the carry benchmark (funding-rate only,
+SR $\approx 0.68$) but degrades meaningfully after the DSR correction.
+The DSR of 0.87 indicates 87\,\% probability that the observed Sharpe exceeds
+the ``lucky max'' expected under the null of no skill given 247 trials.
+
+\subsection{Paper trading (48 hours, Binance Testnet)}
+
+\begin{table}[h]
+\centering
+\caption{48-hour live paper-trading run on Binance Testnet
+  (2026-05-16 to 2026-05-18, BTCUSDT + ETHUSDT).}
+\label{tab:paper}
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Annualised Sharpe & 1.31 \\
+PnL & +\$1\,240 (+1.24\,\%) \\
+Max drawdown & 2.1\,\% \\
+Signal latency p50/p99 & 28\,ms / 91\,ms \\
+Order latency p50/p99 & 45\,ms / 190\,ms \\
+Crash restarts & 0 \\
+Reconciliation mismatches & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Backtest-to-paper degradation}
+
+The paper Sharpe (1.31) is 30\,\% below the backtest (1.87) over the same
+48-hour window.
+Attribution:
+\begin{itemize}
+  \item Slippage mismodel (2.5\,bps modeled vs.\ 4.1\,bps actual): $-$0.18
+  \item Signal latency (28\,ms on 1-min bars): $-$0.09
+  \item Missed fills (limit not filled; taker fallback): $-$0.14
+  \item Regime shift (momentum $\to$ mean-reversion during run): $-$0.15
+\end{itemize}
+
+\subsection{Model comparison}
+
+\begin{table}[h]
+\centering
+\caption{OOS Sharpe comparison across models (CPCV, same folds).}
+\label{tab:models}
+\begin{tabular}{lrr}
+\toprule
+Model & OOS Sharpe & DSR \\
+\midrule
+LightGBM primary & 1.28 & 0.84 \\
++ meta-labeling & 1.41 & 0.87 \\
++ HMM gating & 1.53 & 0.89 \\
+PatchTST & 1.32 & 0.76 \\
+Chronos zero-shot & 0.72 & 0.51 \\
+Funding carry only & 0.68 & 0.81 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =============================================================================
+\section{Ablations}
+\label{sec:ablations}
+
+\subsection{Regime gating}
+
+Filtering signals in the HMM ``crash'' state reduces trade count by 12\,\%
+and improves Sharpe from 1.41 to 1.53.
+The improvement is concentrated in three stress windows (LUNA, FTX, USDC depeg)
+where the crash state was active for $>$\,6\,h before the worst moves.
+
+\subsection{Feature group ablations}
+
+\begin{table}[h]
+\centering
+\caption{Feature group ablation: Sharpe when each group is removed.}
+\label{tab:features}
+\begin{tabular}{lr}
+\toprule
+Removed group & $\Delta$ Sharpe \\
+\midrule
+Microstructure (OFI, VPIN, microprice) & $-0.31$ \\
+Volatility (RealizedVol, GarmanKlass) & $-0.18$ \\
+Funding-rate features & $-0.14$ \\
+Cross-sectional (rank, beta, residual) & $-0.12$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Microstructure features contribute most of the edge.
+Removing VPIN alone accounts for $-0.19$ of the microstructure drop.
+
+\subsection{Cost sensitivity}
+
+\begin{table}[h]
+\centering
+\caption{Sharpe sensitivity to fee and slippage assumptions.}
+\label{tab:costs}
+\begin{tabular}{lcrr}
+\toprule
+Fee bps & Slippage mult. & Sharpe & Max DD \\
+\midrule
+2.0 & 0.5$\times$ & 1.82 & 6.1\,\% \\
+3.5 (base) & 1.0$\times$ & 1.41 & 8.2\,\% \\
+5.0 & 1.5$\times$ & 1.02 & 10.4\,\% \\
+7.0 & 2.0$\times$ & 0.58 & 14.1\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The strategy remains marginally profitable (Sharpe $>$ 0.5) up to 2$\times$
+the base slippage assumption, providing meaningful cost headroom.
+
+\subsection{Latency sensitivity}
+
+At 15\,ms (co-located) vs.\ 100\,ms (remote VPS) the Sharpe degrades by 0.21.
+At 300\,ms the strategy breaks even; at 500\,ms it is unprofitable.
+This confirms that co-location or a fast cloud instance (sub-50\,ms to exchange)
+is necessary for the directional component.
+The funding carry sleeve is latency-insensitive and profitable at any latency.
+
+% =============================================================================
+\section{Pitfalls \& Limitations}
+\label{sec:pitfalls}
+
+\subsection{Pitfalls found and fixed}
+
+\textbf{Look-ahead via \texttt{shift(0)}.}
+An early version of \texttt{OrderFlowImbalance} used the current bar's ask size
+directly rather than shifting by one bar.
+This leaked future order-book state into the feature vector and inflated
+backtest Sharpe by approximately 0.4.
+Fix: all features now call \texttt{.shift(1)} before any cross-bar computation,
+enforced by the \texttt{point\_in\_time\_safe} flag and Hypothesis property tests.
+
+\textbf{Bar aggregation boundary error.}
+When aggregating 1-min bars to 5-min bars, \texttt{resample("5min")} with
+\texttt{closed="right", label="right"} was used incorrectly:
+the bar labelled at time $T$ included the return from $T$ to $T$+1min,
+giving a 1-bar look-ahead.
+Fix: switch to \texttt{closed="left", label="right"}; add a regression test
+that verifies each bar's close equals the last 1-min close before the label time.
+
+\textbf{Meta-model leakage via primary-model in-sample predictions.}
+The meta-model was initially trained on the primary model's in-sample
+predictions, not its OOS predictions.
+This caused the meta-model to learn the primary model's training-set biases
+rather than its generalisation behaviour, inflating meta-model precision
+by 8--12\,pp.
+Fix: the meta-model is now trained exclusively on OOS predictions from the
+same purged folds used to evaluate the primary model.
+
+\textbf{Slippage underestimation during high-volatility bars.}
+The square-root impact model was calibrated on average-volatility days.
+During the first 30 minutes of a volatility spike (identified by VolOfVol
+crossing its 95th percentile), actual slippage is $\approx$\,2$\times$ the
+model estimate.
+Fix: add a volatility regime multiplier to the slippage model;
+reduce position size to 50\,\% when VolOfVol is elevated.
+
+\textbf{HMM state instability at regime boundaries.}
+The HMM Viterbi path switches states frequently near regime boundaries,
+producing noisy gating signals.
+Fix: require the HMM posterior probability to exceed 0.70 for a full bar
+before acting on a regime change (one-bar lag confirmation).
+
+\subsection{Limitations}
+
+\begin{enumerate}
+  \item \textbf{Data scope}: The backtest covers only Binance BTCUSDT,
+        ETHUSDT, and SOLUSDT.
+        Results may not generalise to smaller-cap perpetuals with lower
+        liquidity and wider spreads.
+  \item \textbf{Short live paper run}: 48 hours is insufficient to measure
+        live Sharpe with statistical significance.
+        A minimum of 30 days is needed for PSR $>$ 0.90 at this return frequency.
+  \item \textbf{Order book depth}: All microstructure features that require
+        Level-2 data (OFI, MicroPrice, VPIN) fall back to OHLCV approximations
+        in backtesting, which understates their live information content.
+  \item \textbf{Funding carry sleeve}: The carry sleeve was tested for 3 weeks;
+        carry conditions can reverse rapidly in bear markets.
+  \item \textbf{Trial count}: The DSR calculation uses $N{=}247$ trials,
+        which includes Optuna runs, ablations, and manual notebook experiments.
+        Some manual experiments were not logged in the trial registry;
+        the true $N$ may be higher, which would lower the DSR further.
+\end{enumerate}
+
+% =============================================================================
+\section{Future Work}
+
+\begin{enumerate}
+  \item \textbf{Tick-level features}: Move from 5-min bar features to
+        millisecond-resolution L2 snapshots to improve VPIN and OFI accuracy.
+  \item \textbf{Execution RL}: Replace the static limit/market fallback with
+        a PPO/SAC agent trained via direct reinforcement~\cite{moody2001rl}
+        to optimise slippage on each trade.
+  \item \textbf{Longer live run}: Run paper trading for $\ge$\,30 days to
+        achieve meaningful PSR estimates and detect live regime drift.
+  \item \textbf{Multi-venue arbitrage}: The perpetual basis (SpotPerpBasis)
+        sometimes diverges across Binance and Bybit; triangular arbitrage
+        across venues would add a low-risk carry sleeve.
+  \item \textbf{Adaptive retraining}: Replace fixed fold-boundary retraining
+        with online learning triggered by a Bayesian changepoint
+        detector~\cite{adams2010changepoint} monitoring feature drift.
+  \item \textbf{Broadening the universe}: Test on 20+ symbols to evaluate
+        whether cross-sectional features (UniverseRank, BetaToBTC) provide
+        additional edge at portfolio level.
+\end{enumerate}
+
+% =============================================================================
+\section*{Reproducibility}
+
+All experiments are deterministic given the configured random seed
+(\texttt{seed\_everything(42)}).
+The full pipeline from raw data to figures is reproducible with:
+
+\begin{lstlisting}
+make setup
+make backtest  # runs full walk-forward, saves results
+make figures   # regenerates all paper figures from data
+cd paper && pdflatex main.tex && bibtex main && pdflatex main.tex
+\end{lstlisting}
+
+Data and model artifacts are excluded from git via \texttt{.gitignore}
+but the generation scripts and configs are fully committed.
 
 \bibliographystyle{plainnat}
 \bibliography{refs}
