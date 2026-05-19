@@ -1,5 +1,12 @@
 # Tessera
 
+[![CI](https://github.com/Yash121l/Tessera/actions/workflows/ci.yml/badge.svg)](https://github.com/Yash121l/Tessera/actions/workflows/ci.yml)
+[![Backtest Smoke](https://github.com/Yash121l/Tessera/actions/workflows/backtest-smoke.yml/badge.svg)](https://github.com/Yash121l/Tessera/actions/workflows/backtest-smoke.yml)
+[![Coverage](https://codecov.io/gh/Yash121l/Tessera/branch/main/graph/badge.svg)](https://codecov.io/gh/Yash121l/Tessera)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 **Mid-frequency ML trading system for crypto perpetual futures.**
 Tessera targets holding periods of 15 minutes to 4 hours on USDT-margined
 perpetuals (Binance + Bybit), combining microstructure-informed feature
@@ -82,18 +89,30 @@ curl http://localhost:8080/healthz
 
 ## Research Paper
 
-The full methodology is documented in [`paper/main.tex`](paper/main.tex)
-(IEEE two-column, ~12 pages), covering triple-barrier labeling, CPCV,
-deflated Sharpe validation, model comparison, ablations, and an honest
-pitfalls section.
+The full methodology is documented in
+**[paper/main.pdf](paper/main.pdf)** (compiled, ~12 pages, IEEE two-column) and
+[`paper/main.tex`](paper/main.tex) (LaTeX source).
+Covers triple-barrier labeling, CPCV, deflated Sharpe validation, model comparison,
+ablations, and an honest pitfalls section.
 
-To compile:
+To (re)compile:
 
 ```bash
-cd paper
-pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
-# output: paper/main.pdf
+make compile-paper   # requires: brew install tectonic
 ```
+
+See [paper/README.md](paper/README.md) for Docker build instructions (pinned texlive 2024).
+
+---
+
+## Demo
+
+<!-- TODO: replace with Loom URL after recording -->
+**Loom recording:** _record with `bash paper/demo/record_demo.sh` then upload_
+
+- [demo_script.md](paper/demo_script.md) — voiceover script
+- [cast.cast](paper/demo/cast.cast) — asciinema terminal recording (`asciinema play paper/demo/cast.cast`)
+- [record_demo.sh](paper/demo/record_demo.sh) — automated demo runner
 
 ---
 

@@ -1,0 +1,415 @@
+{
+  "__inputs": [],
+  "__requires": [
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0"},
+    {"type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0"},
+    {"type": "panel", "id": "timeseries", "name": "Time series", "version": ""},
+    {"type": "panel", "id": "stat", "name": "Stat", "version": ""},
+    {"type": "panel", "id": "gauge", "name": "Gauge", "version": ""}
+  ],
+  "annotations": {"list": []},
+  "description": "Tessera trading system — full observability dashboard",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "title": "Row 1 — PnL",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2},
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 1},
+      "id": 2,
+      "options": {"legend": {"calcs": ["last", "max", "min"], "displayMode": "table", "placement": "bottom"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_pnl_realized_usd + tessera_pnl_unrealized_usd",
+          "legendFormat": "Total PnL (realized + unrealized)",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_pnl_realized_usd",
+          "legendFormat": "Realized PnL",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_pnl_unrealized_usd",
+          "legendFormat": "Unrealized PnL",
+          "refId": "C"
+        }
+      ],
+      "title": "Cumulative PnL (USD)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "thresholds"}, "unit": "currencyUSD"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 1},
+      "id": 3,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto"},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "increase(tessera_fee_paid_usd_total[24h])",
+          "legendFormat": "Daily fees (USD)",
+          "refId": "A"
+        }
+      ],
+      "title": "Daily Fees Paid (USD)",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
+      "id": 10,
+      "title": "Row 2 — Risk",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 0.05},
+            {"color": "red", "value": 0.08}
+          ]},
+          "unit": "percentunit",
+          "max": 0.2,
+          "min": 0
+        }
+      },
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 10},
+      "id": 11,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_drawdown_pct",
+          "legendFormat": "Drawdown",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Drawdown %",
+      "type": "gauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 10, "x": 6, "y": 10},
+      "id": 12,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_position_units",
+          "legendFormat": "{{exchange}}/{{symbol}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Position Size (units) per Symbol",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}
+      },
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 10},
+      "id": 13,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(abs(tessera_position_units))",
+          "legendFormat": "Gross Exposure (units)",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(tessera_position_units)",
+          "legendFormat": "Net Exposure (units)",
+          "refId": "B"
+        }
+      ],
+      "title": "Gross / Net Exposure",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
+      "id": 20,
+      "title": "Row 3 — Execution",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "s"}
+      },
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 17},
+      "id": 21,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.50, rate(tessera_signal_latency_seconds_bucket[5m]))",
+          "legendFormat": "signal p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, rate(tessera_signal_latency_seconds_bucket[5m]))",
+          "legendFormat": "signal p95",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.99, rate(tessera_signal_latency_seconds_bucket[5m]))",
+          "legendFormat": "signal p99",
+          "refId": "C"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.50, rate(tessera_order_latency_seconds_bucket[5m]))",
+          "legendFormat": "order p50",
+          "refId": "D"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, rate(tessera_order_latency_seconds_bucket[5m]))",
+          "legendFormat": "order p95",
+          "refId": "E"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.99, rate(tessera_order_latency_seconds_bucket[5m]))",
+          "legendFormat": "order p99",
+          "refId": "F"
+        }
+      ],
+      "title": "Signal & Order Latency (p50/p95/p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}
+      },
+      "gridPos": {"h": 7, "w": 6, "x": 12, "y": 17},
+      "id": 22,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(tessera_fills_total[5m]) / rate(tessera_orders_total[5m])",
+          "legendFormat": "Fill rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Fill Rate (fills / orders)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "currencyUSD"}
+      },
+      "gridPos": {"h": 7, "w": 6, "x": 18, "y": 17},
+      "id": 23,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_fee_paid_usd_total",
+          "legendFormat": "{{exchange}}/{{symbol}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cumulative Fees (USD)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 24},
+      "id": 30,
+      "title": "Row 4 — Data Quality",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 25},
+      "id": 31,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_bar_arrival_rate_per_min",
+          "legendFormat": "{{exchange}}/{{symbol}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Bar Arrival Rate (bars/min) — gap < 0.5 triggers alert",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 30},
+            {"color": "red", "value": 60}
+          ]},
+          "unit": "s"
+        }
+      },
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 25},
+      "id": 32,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "max(tessera_last_bar_age_seconds) by (exchange, symbol)",
+          "legendFormat": "{{exchange}}/{{symbol}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Last Bar Age (s) — >60s triggers data-gap kill switch",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 32},
+      "id": 40,
+      "title": "Row 5 — Safety",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "red", "value": 1}
+          ]},
+          "mappings": [
+            {"options": {"0": {"color": "green", "text": "OK"}, "1": {"color": "red", "text": "TRIPPED"}}, "type": "value"}
+          ]
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 33},
+      "id": 41,
+      "options": {"colorMode": "background", "graphMode": "none"},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_drawdown_pct > bool 0.08",
+          "legendFormat": "Kill switch (drawdown)",
+          "refId": "A"
+        }
+      ],
+      "title": "Kill Switch State",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 1},
+            {"color": "red", "value": 2}
+          ]},
+          "mappings": [
+            {"options": {"0": {"color": "green", "text": "NORMAL"}, "1": {"color": "yellow", "text": "HALF_SIZE"}, "2": {"color": "red", "text": "HALTED"}}, "type": "value"}
+          ]
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 33},
+      "id": 42,
+      "options": {"colorMode": "background", "graphMode": "none"},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_drawdown_pct > bool 0.05",
+          "legendFormat": "Circuit breaker state",
+          "refId": "A"
+        }
+      ],
+      "title": "Circuit Breaker State",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 33},
+      "id": 43,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_runner_restarts_total",
+          "legendFormat": "Crash restarts",
+          "refId": "A"
+        }
+      ],
+      "title": "Runner Restarts",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 33},
+      "id": 44,
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "tessera_reconcile_mismatch_total",
+          "legendFormat": "Reconcile mismatches {{symbol}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Reconciliation Mismatches",
+      "type": "stat"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["tessera", "trading", "crypto"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Tessera — Trading System",
+  "uid": "tessera-main",
+  "version": 1,
+  "weekStart": ""
+}

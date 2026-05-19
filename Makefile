@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup fmt lint test ci backtest figures paper docs help
+.PHONY: setup fmt lint test ci backtest figures paper compile-paper docs help
 
 setup: ## Install deps + pre-commit hooks
 	uv sync --all-extras
@@ -28,6 +28,12 @@ figures: ## Regenerate all paper + docs figures from data
 
 paper: ## Run live paper-trade (Binance Testnet + Bybit Demo)
 	uv run tessera paper start --config configs/live.yaml
+
+compile-paper: ## Compile paper/main.tex → paper/main.pdf (requires tectonic)
+	@command -v tectonic >/dev/null 2>&1 || \
+	  { echo "ERROR: tectonic not found. Install: brew install tectonic  |  cargo install tectonic"; exit 1; }
+	cd paper && tectonic main.tex
+	@echo "Output: paper/main.pdf"
 
 docs: ## Serve MkDocs docs locally at http://localhost:8000
 	uv run mkdocs serve
