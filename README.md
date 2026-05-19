@@ -24,7 +24,7 @@ risk stack with circuit breakers, and live paper trading via Nautilus Trader.
 | Backtest Sharpe | **1.41** | Walk-forward, 2021–2024, 5-min bars |
 | Deflated Sharpe | **0.87** | Bailey & Lopez de Prado (2014), *N*=247 trials |
 | 95 % bootstrap CI | **[0.52, 1.19]** | Stationary block bootstrap |
-| Paper-trading Sharpe | **1.31** | 48-h Binance Testnet run |
+| Paper-trading Sharpe | **≈1.3** | 48-h Binance Testnet run (short window; wide CI) |
 | Max drawdown | **8.2 %** | Backtest peak-to-trough, 4-year window |
 | Avg holding period | **47 min** | Net of neutral (0-label) positions |
 

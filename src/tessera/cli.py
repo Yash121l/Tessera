@@ -97,6 +97,95 @@ def ingest_ohlcv(
     raise typer.Exit()
 
 
+data_app = typer.Typer(help="Data utilities (ADV refresh, etc.).")
+app.add_typer(data_app, name="data")
+
+
+@data_app.command("refresh-adv")
+def data_refresh_adv(
+    exchange: str = typer.Option("binance", help="Exchange ID"),
+    symbols: str | None = typer.Option(None, help="Comma-separated symbols (default: all active)"),
+    lookback_days: int = typer.Option(30, help="Rolling window for ADV calculation"),
+    output: str = typer.Option("configs/adv_live.yaml", help="Output YAML path"),
+) -> None:
+    """Refresh ADV (average daily volume) estimates from exchange and write to YAML.
+
+    Uses CCXT to fetch recent OHLCV volume, computes a rolling mean, and
+    writes results to the output YAML.  Falls back to configs/adv_defaults.yaml
+    when data is unavailable, incrementing the tessera_adv_fallback_total counter.
+    """
+    import time
+    from pathlib import Path
+
+    import yaml
+
+    settings, run_id = _bootstrap()
+    log = structlog.get_logger("tessera.cli.data")
+    log.info("adv_refresh_start", exchange=exchange, lookback_days=lookback_days)
+
+    from tessera.metrics import ADV_FALLBACK
+
+    defaults_path = Path("configs/adv_defaults.yaml")
+    defaults: dict[str, float] = {}
+    default_fallback = 50_000_000.0
+    if defaults_path.exists():
+        with open(defaults_path) as f:
+            raw = yaml.safe_load(f)
+        for tier in ("tier1", "tier2"):
+            for sym, adv in (raw.get(tier) or {}).items():
+                defaults[sym] = float(adv)
+        default_fallback = float(raw.get("default_fallback", default_fallback))
+
+    if symbols:
+        symbol_list = [s.strip() for s in symbols.split(",")]
+    else:
+        from tessera.data.universe import Universe
+
+        universe = Universe()
+        symbol_list = universe.active_at(datetime.now(UTC))
+        if not symbol_list:
+            typer.echo("No active symbols. Run 'tessera ingest universe' first.")
+            raise typer.Exit(1)
+
+    result: dict[str, float] = {}
+    try:
+        import ccxt  # type: ignore[import-untyped]
+
+        ex = getattr(ccxt, exchange)()
+    except Exception:
+        typer.echo(f"Warning: CCXT exchange '{exchange}' unavailable. Using defaults.", err=True)
+        ex = None
+
+    t0 = time.time()
+    for sym in symbol_list:
+        adv_estimate: float | None = None
+        if ex is not None:
+            try:
+                ohlcv = ex.fetch_ohlcv(sym, "1d", limit=lookback_days)
+                if ohlcv:
+                    daily_vols = [row[5] * row[4] for row in ohlcv if row[4] and row[5]]
+                    if daily_vols:
+                        adv_estimate = float(sum(daily_vols) / len(daily_vols))
+            except Exception as exc:
+                log.debug("adv_fetch_failed", symbol=sym, error=str(exc))
+
+        if adv_estimate is None:
+            adv_estimate = defaults.get(sym, default_fallback)
+            ADV_FALLBACK.labels(symbol=sym).inc()
+            log.debug("adv_fallback_used", symbol=sym, adv=adv_estimate)
+
+        result[sym] = adv_estimate
+
+    out_path = Path(output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w") as f:
+        yaml.dump({"adv_by_symbol": result}, f, default_flow_style=False)
+
+    elapsed = time.time() - t0
+    typer.echo(f"ADV refresh complete: {len(result)} symbols → {out_path}  ({elapsed:.1f}s)")
+    raise typer.Exit()
+
+
 features_app = typer.Typer(help="Feature engineering pipeline.")
 app.add_typer(features_app, name="features")
 
@@ -754,7 +843,9 @@ def report_backtest(
         ..., "--run-id", help="Backtest run ID (reads from data/backtest_runs/<run_id>/)"
     ),
     output: str = typer.Option("docs/figures/", "--output", help="Output directory"),
-    n_trials: int = typer.Option(100, "--n-trials", help="Total trial count (Optuna + manual)"),
+    n_trials: int = typer.Option(
+        247, "--n-trials", help="Total trial count (Optuna + manual); see TESSERA_TRIAL_COUNT"
+    ),
     benchmark_path: str | None = typer.Option(
         None, "--benchmark", help="Parquet path for benchmark daily returns"
     ),

@@ -56,6 +56,11 @@ class MLDirectionalConfig(TesseraStrategyConfig, frozen=True):
     half_spread_bps: float = 2.5
     min_trade_notional: float = 10.0
 
+    # Order execution
+    # post_only_orders=True: submit limit orders with POST_ONLY; rejected if marketable.
+    # Set False for testing with synthetic data where bid/ask spread is zero.
+    post_only_orders: bool = True
+
     # Risk stack
     risk_db_dsn: str = ""  # Postgres DSN for CircuitBreaker; empty = in-memory
     daily_loss_threshold: float = 0.03
@@ -240,9 +245,13 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
         return int(pred[-1])
 
     def _compute_meta_prob(self, id_str: str, signal: int) -> float:
-        """Meta-model probability in [0, 1]; defaults to 1.0 (full confidence)."""
+        """Meta-model probability in (0, 1); defaults to 0.99 when no meta model.
+
+        Must be strictly < 1.0: kelly_from_meta_prob guards `p_win < 1.0`
+        and returns 0 for p_win == 1.0, which would suppress all trades.
+        """
         if self._meta_model is None or signal == 0:
-            return 1.0
+            return 0.99  # full confidence proxy that satisfies Kelly's open-interval guard
 
         features = self._build_features(id_str)
         if features is None:
@@ -316,7 +325,7 @@ class MLDirectionalStrategy(TesseraBaseStrategy):
             quantity=qty,
             price=limit_price,
             time_in_force=TimeInForce.GTC,
-            post_only=True,
+            post_only=self._ml_cfg.post_only_orders,
         )
         self.submit_order(order)
         self._kill_switch.record_order_event(rejected=False)

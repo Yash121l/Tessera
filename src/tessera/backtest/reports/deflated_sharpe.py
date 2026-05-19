@@ -22,6 +22,18 @@ from tessera.backtest.reports.probabilistic_sharpe import probabilistic_sharpe
 
 _EULER_MASCHERONI = 0.5772156649015328
 
+# Published trial count for the Tessera backtest paper (Bailey & LdP 2014).
+# Breakdown:
+#   100  Optuna trials — primary LightGBM model
+#   100  Optuna trials — meta LightGBM model
+#    20  manual trials — PatchTST hyperparameter sweep (patch length, LR, dropout)
+#    10  manual trials — Chronos threshold calibration
+#    10  manual trials — TFT context length / quantile head sweeps
+#     7  manual trials — regime model variants + ensemble weight experiments
+#   ---
+#   247  total
+TESSERA_TRIAL_COUNT = 247
+
 
 def deflated_sharpe(
     observed_sr: float,

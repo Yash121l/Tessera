@@ -209,6 +209,5 @@ source = ["tessera"]
 branch = true
 
 [tool.coverage.report]
-# TODO: Raise to 80 once feature code lands
-fail_under = 0
+fail_under = 48
 show_missing = true

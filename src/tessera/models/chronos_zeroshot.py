@@ -36,7 +36,7 @@ logger = structlog.get_logger(__name__)
 
 # Pinned HuggingFace revision for reproducibility — update consciously
 CHRONOS_MODEL_ID = "amazon/chronos-bolt-base"
-CHRONOS_MODEL_REVISION = "main"  # pin to a commit SHA in production
+CHRONOS_MODEL_REVISION = "5d9f166d69f47aef3401367a7b842e78fe97b121"
 
 _LOOKBACK = 60
 _PREDICTION_LENGTH = 1

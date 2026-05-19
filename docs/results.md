@@ -139,7 +139,7 @@ The improvement is concentrated in three stress windows:
 
 | Metric | Value |
 |---|---|
-| Annualised Sharpe | **1.31** |
+| Annualised Sharpe | **≈1.3** (48-h window; SE ≈ 0.4) |
 | Total PnL | +$1 240 (+1.24 %) |
 | Max intraday drawdown | 2.1 % |
 | Signal latency p50 / p99 | 28 ms / 91 ms |
@@ -150,7 +150,7 @@ The improvement is concentrated in three stress windows:
 
 ### Backtest-to-paper degradation breakdown
 
-The live Sharpe (1.31) is 30 % below the backtest Sharpe (1.87) for the same window.
+The live Sharpe (≈1.3) is 30 % below the backtest Sharpe (1.87) for the same window.
 
 | Source | Sharpe impact |
 |---|---|

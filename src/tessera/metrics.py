@@ -137,6 +137,19 @@ EXCHANGE_PING_LATENCY = Gauge(
     ["exchange"],
 )
 
+ADV_FALLBACK = Counter(
+    "tessera_adv_fallback_total",
+    "Number of times the ADV estimator fell back to the static config default "
+    "because live ADV data was unavailable for a symbol.",
+    ["symbol"],
+)
+
+PORTFOLIO_LEVERAGE_GROSS = Gauge(
+    "tessera_portfolio_leverage_gross",
+    "Gross portfolio leverage: sum(|notional_i|) / NAV. "
+    "Updated after every fill or position reconciliation.",
+)
+
 
 def start_metrics_server(port: int = 9090) -> None:
     """Start the Prometheus HTTP metrics server.

@@ -81,8 +81,48 @@ def round_trip_fee_bps(
     entry_is_maker: bool = True,
     exit_is_maker: bool = False,
     vip_tier: int = 0,
+    taker_fraction: float | None = None,
 ) -> float:
-    """Total round-trip cost in bps (entry leg + exit leg)."""
+    """Total round-trip cost in bps (entry leg + exit leg).
+
+    Args:
+        taker_fraction: If provided (0–1), overrides ``entry_is_maker`` /
+            ``exit_is_maker`` with a continuous taker-mix model:
+            effective = taker_fraction * taker_bps + (1-taker_fraction) * maker_bps.
+            Useful for sensitivity analysis across the make/take spectrum.
+    """
+    if taker_fraction is not None:
+        takers = _SCHEDULES.get(exchange.lower(), {})
+        max_tier = max(takers) if takers else 0
+        capped = min(vip_tier, max_tier)
+        effective_tier = max(t for t in takers if t <= capped) if takers else 0
+        ft = takers.get(effective_tier, FeeTier(2.0, 5.0))
+        leg = ft.maker_bps * (1.0 - taker_fraction) + ft.taker_bps * taker_fraction
+        return 2 * leg  # entry + exit at same mix
+
     entry = effective_fee_bps(exchange, symbol, "buy", entry_is_maker, vip_tier)
     exit_ = effective_fee_bps(exchange, symbol, "sell", exit_is_maker, vip_tier)
     return entry + exit_
+
+
+def fee_sensitivity_grid(
+    exchange: str,
+    symbol: str,
+    taker_fractions: list[float] | None = None,
+    vip_tiers: list[int] | None = None,
+) -> list[dict[str, float]]:
+    """Return a grid of round-trip costs for sensitivity analysis.
+
+    Each row: {'taker_fraction': f, 'vip_tier': t, 'round_trip_bps': c}.
+    """
+    if taker_fractions is None:
+        taker_fractions = [0.0, 0.25, 0.5, 0.75, 1.0]
+    if vip_tiers is None:
+        vip_tiers = [0, 1, 3, 5]
+
+    rows = []
+    for vip in vip_tiers:
+        for tf in taker_fractions:
+            cost = round_trip_fee_bps(exchange, symbol, vip_tier=vip, taker_fraction=tf)
+            rows.append({"taker_fraction": tf, "vip_tier": vip, "round_trip_bps": cost})
+    return rows

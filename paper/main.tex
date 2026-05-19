@@ -81,7 +81,9 @@ with realistic fee/slippage/latency simulation.
 The backtest walk-forward Sharpe is \textbf{1.41}; after correcting for
 $N{=}247$ hyperparameter trials the deflated Sharpe is \textbf{0.87}
 (95\,\% bootstrap CI 0.52--1.19), indicating genuine but moderate skill.
-A 48-hour Binance-testnet paper run produced a live Sharpe of \textbf{1.31},
+A 48-hour Binance-testnet paper run produced a live Sharpe of ${\approx}1.3$%
+\footnote{Annualised from 48\,h of data; the standard error on this estimate
+  is ${\approx}0.4$, so the point value should not be over-interpreted.},
 with a backtest-to-paper degradation of $-30\,\%$ attributed primarily to
 missed fills and regime shift.
 All code, configs, and figure-generation scripts are publicly available.
@@ -463,7 +465,7 @@ the ``lucky max'' expected under the null of no skill given 247 trials.
 \toprule
 Metric & Value \\
 \midrule
-Annualised Sharpe & 1.31 \\
+Annualised Sharpe (48-h est.) & $\approx 1.3$ \\
 PnL & +\$1\,240 (+1.24\,\%) \\
 Max drawdown & 2.1\,\% \\
 Signal latency p50/p99 & 28\,ms / 91\,ms \\
@@ -476,7 +478,7 @@ Reconciliation mismatches & 0 \\
 
 \subsection{Backtest-to-paper degradation}
 
-The paper Sharpe (1.31) is 30\,\% below the backtest (1.87) over the same
+The paper Sharpe (${\approx}1.3$) is 30\,\% below the backtest (1.87) over the same
 48-hour window.
 Attribution:
 \begin{itemize}

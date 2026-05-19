@@ -18,5 +18,5 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Run 1-day backtest smoke test
-        run: echo "TODO - backtest smoke test with fixture data"
+      - name: Run backtest smoke test
+        run: uv run pytest tests/integration/test_backtest_smoke.py -v --timeout=120

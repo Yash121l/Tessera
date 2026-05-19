@@ -239,7 +239,7 @@ def _sentry_alert(message: str, extra: dict[str, Any] | None = None) -> None:
     try:
         import sentry_sdk
 
-        with sentry_sdk.push_scope() as scope:
+        with sentry_sdk.new_scope() as scope:
             scope.level = "critical"  # type: ignore[assignment]
             if extra:
                 for k, v in extra.items():

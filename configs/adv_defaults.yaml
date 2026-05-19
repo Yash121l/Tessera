@@ -1,0 +1,29 @@
+# Average Daily Volume (ADV) defaults by symbol tier (USD notional).
+#
+# Used when live ADV data is unavailable (e.g. first startup, data gap).
+# Refresh with: uv run tessera data refresh-adv
+#
+# Sources: Binance/Bybit 30-day average as of 2026-05 (rounded to nearest $1B).
+# Tier 1: major liquid perps  (ADV > $1B)
+# Tier 2: mid-cap perps       (ADV $100M–$1B)
+# Tier 3: small-cap perps     (ADV < $100M — treat as illiquid, use conservative default)
+
+tier1:
+  BTCUSDT: 5_000_000_000     # ~$5B/day
+  ETHUSDT: 3_000_000_000     # ~$3B/day
+  SOLUSDT:   800_000_000     # ~$800M/day
+  BNBUSDT:   500_000_000     # ~$500M/day
+  XRPUSDT:   400_000_000     # ~$400M/day
+
+tier2:
+  AVAXUSDT:  200_000_000
+  DOGEUSDT:  300_000_000
+  ADAUSDT:   150_000_000
+  DOTUSDT:   120_000_000
+  LINKUSDT:  200_000_000
+  MATICUSDT: 250_000_000
+  LTCUSDT:   180_000_000
+  ATOMUSDT:  100_000_000
+
+# Fallback applied when symbol not found in either tier.
+default_fallback: 50_000_000   # $50M — conservative; slippage model skews larger

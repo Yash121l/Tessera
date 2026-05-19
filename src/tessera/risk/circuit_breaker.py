@@ -270,7 +270,7 @@ def _sentry_alert(message: str, level: str = "error", extra: dict[str, Any] | No
     try:
         import sentry_sdk
 
-        with sentry_sdk.push_scope() as scope:
+        with sentry_sdk.new_scope() as scope:
             scope.level = level  # type: ignore[assignment]
             if extra:
                 for k, v in extra.items():

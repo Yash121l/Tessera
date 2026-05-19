@@ -19,6 +19,7 @@ import math
 from dataclasses import dataclass, field
 
 import numpy as np
+import pandas as pd
 
 
 @dataclass
@@ -38,20 +39,35 @@ class OHLCVSlippageModel:
 
     _k_by_symbol: dict[str, float] = field(default_factory=dict, init=False, repr=False)
 
-    def fit_k(self, symbol: str, fills_df: pd.DataFrame) -> None:  # type: ignore[name-defined]  # noqa: F821
-        """Fit k for a symbol using OLS on historical fill slippage.
+    def fit_k(self, symbol: str, fills_df: pd.DataFrame) -> None:
+        """Fit k for a symbol using Huber regression on historical fill slippage.
+
+        Huber regression is more robust than OLS to outlier fills (e.g. flash
+        spikes). Requires at least 30 observations for a stable estimate.
 
         fills_df columns: order_notional (USD), adv_notional (USD), actual_slippage_bps.
         """
-        if fills_df.empty or len(fills_df) < 5:
+        if fills_df.empty or len(fills_df) < 30:
             return
 
-        x = np.sqrt(fills_df["order_notional"] / fills_df["adv_notional"].clip(lower=1.0))
+        x = np.sqrt(
+            fills_df["order_notional"].values / fills_df["adv_notional"].clip(lower=1.0).values
+        ).reshape(-1, 1)
         y = fills_df["actual_slippage_bps"].values
-        denom = float(np.dot(x, x))
-        if denom < 1e-12:
-            return
-        k_hat = float(np.dot(x, y) / denom)
+
+        try:
+            from sklearn.linear_model import HuberRegressor
+
+            reg = HuberRegressor(fit_intercept=False, epsilon=1.35, max_iter=300)
+            reg.fit(x, y)
+            k_hat = float(reg.coef_[0])
+        except Exception:
+            # Fallback to OLS if sklearn is unavailable or optimization fails
+            denom = float(np.dot(x.ravel(), x.ravel()))
+            if denom < 1e-12:
+                return
+            k_hat = float(np.dot(x.ravel(), y) / denom)
+
         self._k_by_symbol[symbol] = max(0.1, k_hat)
 
     def impact_bps(
