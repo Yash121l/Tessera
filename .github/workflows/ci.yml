@@ -40,9 +40,13 @@ jobs:
       - uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
+          enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        # backtest: nautilus-trader + quantstats (required for smoke test coverage)
+        # ml: lightgbm (required for smoke test model training)
+        # sequence/docs omitted — heavy torch deps not needed for coverage
+        run: uv sync --extra dev --extra ml --extra backtest
 
       - name: Run tests
         run: uv run pytest --cov=tessera --cov-report=term-missing --cov-report=xml
